@@ -103,13 +103,22 @@ public final class Menus implements Listener {
             button(h,19,Material.EMERALD,"Support",NamedTextColor.GREEN,() -> history(p,target,"support",0),"All-time: "+amount(profile.alltimeCents())+"  "+rank(profile.alltimeRank()),"Monthly: "+amount(profile.monthlyCents())+"  "+rank(profile.monthlyRank()),"Supporting since: "+date(profile.firstSupportedAt()),"Click for public-safe purchase history.");
             button(h,21,Material.NAME_TAG,"Sandbox Ranks",NamedTextColor.LIGHT_PURPLE,null,profile.rankText(),profile.devotee()?"Devotee until: "+date(profile.devoteeUntil()):"Devotee is not active.",profile.renewalCancelled()?"Renewal cancelled; paid access remains until expiry.":"No cancellation recorded.","Preview entitlements only. LuckPerms is not modified.");
             button(h,23,Material.GOLDEN_HELMET,"Glorious",NamedTextColor.GOLD,() -> awards(p,target,0),profile.glorious()?"Permanently earned":"Not yet earned","Monthly victories: "+profile.monthlyWins(),"Manual test awards are not monthly victories.");
-            button(h,29,Material.CHEST,"Gifts Sent",NamedTextColor.AQUA,() -> history(p,target,"sent",0),"Completed gifts: "+profile.giftsSent(),"Gift purchases count towards the payer's support.");
-            button(h,33,Material.ENDER_CHEST,"Gifts Received",NamedTextColor.AQUA,() -> history(p,target,"received",0),"Completed gifts: "+profile.giftsReceived(),"Receiving a gift does not add to money paid.");
+            boolean privateHistory = !runtime.settings().showGiftIdentities() && !target.equals(p.getUniqueId());
+            button(h,29,Material.CHEST,"Gifts Sent",NamedTextColor.AQUA,() -> history(p,target,"sent",0),
+                    privateHistory?"Private gifts are hidden from public history.":"Completed gifts: "+profile.giftsSent(),
+                    "Gift purchases count towards the payer's support.");
+            button(h,33,Material.ENDER_CHEST,"Gifts Received",NamedTextColor.AQUA,() -> history(p,target,"received",0),
+                    privateHistory?"Private gifts are hidden from public history.":"Completed gifts: "+profile.giftsReceived(),
+                    "Receiving a gift does not add to money paid.");
         }
         button(h,45,Material.ARROW,"Back to Donors",NamedTextColor.YELLOW,() -> leaderboard(p,true,0));show(p,h);
     }
     public void history(Player p,UUID target,String type,int requestedPage){
-        View view=runtime.view();List<Payment> history=view.history(target,type);
+        View view=runtime.view();List<Payment> history=view.history(target,type).stream()
+                .filter(pay -> GiftIdentityPolicy.visibleToViewer(
+                        pay.gift() && !runtime.settings().showGiftIdentities(),
+                        pay.buyer(),pay.recipient(),p.getUniqueId()))
+                .toList();
         Holder h=base(p,type.equals("sent")?"Gifts Sent":type.equals("received")?"Gifts Received":"Support History");
         int max=Math.max(0,(history.size()-1)/GRID.length),page=Math.max(0,Math.min(max,requestedPage));
         button(h,4,Material.BOOK,"Public-safe History",NamedTextColor.AQUA,null,"Test records only. No emails, IPs or payment IDs.");
