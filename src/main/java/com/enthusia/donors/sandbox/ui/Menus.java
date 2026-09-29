@@ -115,12 +115,14 @@ public final class Menus implements Listener {
         button(h,4,Material.BOOK,"Public-safe History",NamedTextColor.AQUA,null,"Test records only. No emails, IPs or payment IDs.");
         for(int i=0;i<GRID.length && page*GRID.length+i<history.size();i++){
             Payment pay=history.get(page*GRID.length+i);Person buyer=view.people().get(pay.buyer()),recipient=view.people().get(pay.recipient());
-            boolean hide=pay.gift() && !runtime.settings().showGiftIdentities();
-            String from=hide?"Anonymous supporter":buyer.name();
+            boolean privateGift=pay.gift() && !runtime.settings().showGiftIdentities();
+            GiftIdentityPolicy visibility=GiftIdentityPolicy.forHistory(privateGift,buyer.uuid(),recipient.uuid(),p.getUniqueId(),type);
+            String from=visibility.showBuyer()?buyer.name():"Anonymous supporter";
+            String to=visibility.showRecipient()?recipient.name():"Private recipient";
             UUID other=type.equals("received")?buyer.uuid():recipient.uuid();
-            Runnable open=hide&&type.equals("received")?null:() -> profile(p,other);
+            Runnable open=visibility.linkOther()?() -> profile(p,other):null;
             button(h,GRID[i],pay.status()==Status.PAID?Material.PAPER:Material.RED_DYE,pay.product().display()+" - "+date(pay.paidAt()),NamedTextColor.WHITE,open,
-                    "Type: "+pay.kind(),"Paid by: "+from,"Received by: "+recipient.name(),"Support: "+amount(pay.cents()),"Status: "+pay.status(),open==null?"Gifter identity is private.":"Click to view the other player's profile.");
+                    "Type: "+pay.kind(),"Paid by: "+from,"Received by: "+to,"Support: "+amount(pay.cents()),"Status: "+pay.status(),open==null?"Gift identity is private.":"Click to view the other player's profile.");
         }
         if(history.isEmpty())button(h,22,Material.PAPER,"No history yet",NamedTextColor.GRAY,null);
         paging(p,h,page,max,n -> history(p,target,type,n),() -> profile(p,target));show(p,h);

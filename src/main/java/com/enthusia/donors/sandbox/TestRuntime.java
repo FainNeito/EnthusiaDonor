@@ -330,7 +330,7 @@ public final class TestRuntime implements CommandExecutor,TabCompleter,Listener,
         LuckPermsReference.summaryLines().forEach(line -> reply(sender,line));
     }
     private void status(CommandSender sender){
-        reply(sender,"Build 1.1.0-test.4 | isolated, persistent sandbox | test month "+view().month()+" ("+view().zone()+")");
+        reply(sender,"Build "+plugin.getDescription().getVersion()+" | isolated, persistent sandbox | test month "+view().month()+" ("+view().zone()+")");
         reply(sender,"Profiles: "+view().people().size()+" | payments: "+view().payments().size()+" | permanent awards: "+view().awards().size());
         reply(sender,"Tebex: DISCONNECTED | production DB/R2: DISCONNECTED | LuckPerms writes: DISCONNECTED");
         reply(sender,"Discord: "+(settings.discordEnabled()&&!settings.discordUrl().isBlank()?"DEDICATED TEST WEBHOOK ENABLED":"DISABLED")+" | virtual clock is paused between test actions.");
