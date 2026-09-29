@@ -1,30 +1,31 @@
 name: EnthusiaDonors
-version: ${version}
+version: '${project.version}'
 main: com.enthusia.donors.EnthusiaDonorsPlugin
-api-version: "1.20"
+api-version: '1.21'
 author: Enthusia
-softdepend:
-  - PlaceholderAPI
+description: Isolated donor GUI and broadcast test build. NOT a production donor processor.
+libraries:
+  - org.xerial:sqlite-jdbc:3.49.1.0
+  - com.google.code.gson:gson:2.11.0
 commands:
   enthusiadonors:
-    description: Manage EnthusiaDonors donor leaderboards.
-    usage: /enthusiadonors <reload|refresh|status|top|debug>
-    aliases:
-      - edonors
+    description: EnthusiaDonors sandbox administration.
+    usage: /enthusiadonors test menu
+    aliases: [edonors]
+    permission: enthusiadonors.test
+  donors:
+    description: View test donor leaderboards, gifts and profiles.
+    usage: /donors [monthly|alltime|me|profile|directory|glorious]
+    permission: enthusiadonors.view
 permissions:
+  enthusiadonors.view:
+    description: View public-safe sandbox donor menus.
+    default: true
+  enthusiadonors.test:
+    description: Simulate and manage isolated test donations. Never grant to normal players.
+    default: op
   enthusiadonors.admin:
-    description: Allows all EnthusiaDonors admin commands.
     default: op
     children:
-      enthusiadonors.reload: true
-      enthusiadonors.refresh: true
-      enthusiadonors.status: true
-      enthusiadonors.debug: true
-  enthusiadonors.reload:
-    default: op
-  enthusiadonors.refresh:
-    default: op
-  enthusiadonors.status:
-    default: op
-  enthusiadonors.debug:
-    default: op
+      enthusiadonors.test: true
+      enthusiadonors.view: true

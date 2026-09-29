@@ -1,0 +1,97 @@
+# EnthusiaDonors 1.1.0-test.6 — ISOLATED TEST BUILD ONLY.
+# No setting in this file can enable production Tebex/R2/LuckPerms writes.
+# LuckPerms reference from build-test-sync-20260920:
+# avid(15) / avid-founder(16), devotee(20) / devotee-founder(21),
+# glorious(25) / glorious-founders(26). The supplied snapshot also contains
+# a parent reference to group.glorious-founder, but no group with that exact name.
+# Persistent simulated data: plugins/EnthusiaDonors/testing/donors-test.db
+# Upstream config.yml and production databases are not read or modified.
+timezone: America/Chicago
+# Leave blank until the real store address is confirmed. HTTPS only.
+store-url: ''
+# EXAMPLE testing amounts, NOT advertised live store prices.
+test-prices:
+  avid: '20.00'
+  devotee: '5.00'
+test-subscription-days: 30
+privacy:
+  show-amounts: true
+  show-gift-identities: true
+skins:
+  network-enabled: true
+  timeout-seconds: 4
+  cache-minutes: 60
+discord:
+  enabled: false
+  # Use a webhook in a SEPARATE TEST channel. Never paste a production URL here.
+  # This secret stays on your server. Do not commit it or send it in a screenshot.
+  test-webhook-url: ''
+  username: 'Enthusia Purchases [TEST]'
+broadcast:
+  # Broadcast presentation. All fields support MiniMessage except store-display-text,
+  # which is displayed as literal text and remains clickable when store-url is set.
+  header: '<green>$$ Donation Broadcast</green>'
+  marker: '<dark_gray>[TEST]</dark_gray>'
+  top-divider: '<gray>────────────────────────────────────────</gray>'
+  bottom-divider: '<gray>────────────────────────────────────────</gray>'
+  store-cta: 'Donate to support the server'
+  store-display-text: '' # Blank displays the configured URL; otherwise use this clickable label.
+  rank-formats:
+    avid: '<#00C4FF><bold>[<#17CCFF>A<#2ED3FF>v<#44DBFF>i<#5BE2FF>d<#72EAFF>]</bold><reset>'
+    devotee: '<#0007FF><bold>[<#070CFF>D<#0E12FF>e<#1417FF>v<#1B1DFF>o<#2222FF>t<#2927FF>e<#2F2DFF>e<#3632FF>]</bold>'
+    glorious: '<b><gradient:#FF110A:#C70000>[Glorious]</gradient></b>'
+  # Private to the operator by default. To enable server-wide TEST messages:
+  # set true, /edonors reload, /edonors test audience server confirm
+  allow-server-audience: false
+  # Optional proxy-wide TEST chat via the BungeeCord-compatible MessageRaw channel.
+  # Requires Velocity bungee-plugin-message-channel: true (or a BungeeCord-compatible proxy).
+  # Enable only on every test backend, then run /edonors reload and
+  # /edonors test audience network confirm. Operator permission is required.
+  allow-network-audience: false
+  # Eight lines align beside the 8x8 recipient face. Empty lines are intentional.
+  # Components: <buyer>, <recipient>, <rank>, <month>, <store>.
+  purchase:
+    - ''
+    - '<buyer> <gray>just donated</gray>'
+    - '<gray>and received</gray> <rank><gray>!</gray>'
+    - ''
+    - ''
+    - '<gray><cta></gray>'
+    - '<gray>at</gray> <store>'
+    - ''
+  subscription:
+    - ''
+    - '<buyer> <gray>just subscribed</gray>'
+    - '<gray>and received</gray> <rank><gray>!</gray>'
+    - ''
+    - ''
+    - '<gray><cta></gray>'
+    - '<gray>at</gray> <store>'
+    - ''
+  gift:
+    - ''
+    - '<buyer> <gray>just gifted</gray>'
+    - '<rank> <gray>to</gray>'
+    - '<recipient><gray>!</gray>'
+    - ''
+    - '<gray><cta></gray>'
+    - '<gray>at</gray> <store>'
+    - ''
+  renewal:
+    - ''
+    - '<buyer> <gray>renewed their</gray>'
+    - '<rank> <gray>subscription!</gray>'
+    - ''
+    - ''
+    - '<gray><cta></gray>'
+    - '<gray>at</gray> <store>'
+    - ''
+  glorious:
+    - ''
+    - '<recipient> <gray>finished</gray>'
+    - '<gray>#1 for</gray> <month><gray>!</gray>'
+    - ''
+    - '<gray>Permanently awarded</gray> <rank><gray>!</gray>'
+    - '<gray><cta></gray>'
+    - '<gray>at</gray> <store>'
+    - ''
