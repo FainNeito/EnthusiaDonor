@@ -52,17 +52,16 @@ public final class TebexClient {
         HttpClient client = HttpClient.newBuilder()
                 .connectTimeout(java.time.Duration.ofSeconds(config.timeoutSeconds()))
                 .build();
-        List<CompletableFuture<Optional<String>>> futures = config.excludedTransactionIds().stream()
+        List<CompletableFuture<String>> futures = config.excludedTransactionIds().stream()
                 .map(transactionId -> fetchPaymentIdHash(client, config, transactionId))
                 .toList();
         CompletableFuture<?>[] all = futures.toArray(CompletableFuture[]::new);
         return CompletableFuture.allOf(all).thenApply(ignored -> futures.stream()
                 .map(CompletableFuture::join)
-                .flatMap(Optional::stream)
                 .collect(Collectors.toUnmodifiableSet()));
     }
 
-    private CompletableFuture<Optional<String>> fetchPaymentIdHash(HttpClient client, DonorsConfig config, String transactionId) {
+    private CompletableFuture<String> fetchPaymentIdHash(HttpClient client, DonorsConfig config, String transactionId) {
         String encoded = URLEncoder.encode(transactionId, StandardCharsets.UTF_8);
         URI uri = URI.create(PAYMENTS_URI + "/" + encoded);
         HttpRequest request = HttpRequest.newBuilder(uri)
@@ -76,8 +75,7 @@ public final class TebexClient {
         return client.sendAsync(request, HttpResponse.BodyHandlers.ofString())
                 .thenApply(response -> {
                     if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                        logger.warning("Could not resolve one configured excluded Tebex transaction; HTTP " + response.statusCode() + ".");
-                        return Optional.<String>empty();
+                        throw new TebexException("Could not resolve one configured excluded Tebex transaction; HTTP " + response.statusCode());
                     }
                     JsonObject payment = JsonParser.parseString(response.body()).getAsJsonObject();
                     return stringValue(payment, "id").map(id -> {
@@ -86,11 +84,7 @@ public final class TebexClient {
                         } catch (Exception ex) {
                             throw new IllegalStateException("Unable to hash resolved Tebex payment ID", ex);
                         }
-                    });
-                })
-                .exceptionally(ex -> {
-                    logger.warning("Could not resolve one configured excluded Tebex transaction; keeping refresh alive.");
-                    return Optional.empty();
+                    }).orElseThrow(() -> new TebexException("A configured excluded Tebex transaction had no payment ID"));
                 });
     }
 
@@ -101,8 +95,8 @@ public final class TebexClient {
             List<PaymentRecord> collected
     ) {
         if (page > config.maxPages()) {
-            logger.warning("Tebex refresh stopped at configured max-pages=" + config.maxPages() + ".");
-            return CompletableFuture.completedFuture(collected);
+            return CompletableFuture.failedFuture(new TebexException(
+                    "Tebex history exceeds max-pages=" + config.maxPages() + "; refusing an incomplete leaderboard"));
         }
 
         URI uri = URI.create(PAYMENTS_URI + "?paged=1&page=" + URLEncoder.encode(String.valueOf(page), StandardCharsets.UTF_8));
@@ -120,27 +114,29 @@ public final class TebexClient {
                         return CompletableFuture.failedFuture(new TebexException("Tebex returned HTTP " + response.statusCode()));
                     }
                     PageResult pageResult = parsePayments(response.body());
+                    if (pageResult.currentPage() != page) {
+                        return CompletableFuture.failedFuture(new TebexException("Tebex returned unexpected page " + pageResult.currentPage()));
+                    }
                     collected.addAll(pageResult.payments());
-                    if (pageResult.hasNextPage() && !pageResult.payments().isEmpty()) {
+                    if (pageResult.hasNextPage()) {
                         return fetchPage(client, config, page + 1, collected);
                     }
                     return CompletableFuture.completedFuture(collected);
                 });
     }
 
-    private PageResult parsePayments(String body) {
+    PageResult parsePayments(String body) {
         JsonElement root = JsonParser.parseString(body);
-        JsonArray data;
-        boolean hasNext = false;
-        if (root.isJsonArray()) {
-            data = root.getAsJsonArray();
-        } else {
-            JsonObject object = root.getAsJsonObject();
-            data = object.has("data") && object.get("data").isJsonArray() ? object.getAsJsonArray("data") : new JsonArray();
-            int current = intValue(object, "current_page").orElse(1);
-            int last = intValue(object, "last_page").orElse(current);
-            hasNext = current < last && !isNullOrBlank(object, "next_page_url");
-        }
+        if (!root.isJsonObject()) throw new TebexException("Tebex paginated response was not an object");
+        JsonObject object = root.getAsJsonObject();
+        if (!object.has("data") || !object.get("data").isJsonArray())
+            throw new TebexException("Tebex paginated response omitted payment data");
+        JsonArray data = object.getAsJsonArray("data");
+        int current = intValue(object, "current_page").orElseThrow(() -> new TebexException("Tebex paginated response omitted current_page"));
+        int last = intValue(object, "last_page").orElseThrow(() -> new TebexException("Tebex paginated response omitted last_page"));
+        if (current < 1 || last < current) throw new TebexException("Tebex pagination was inconsistent");
+        boolean hasNext = current < last;
+        if (hasNext && data.isEmpty()) throw new TebexException("Tebex returned an empty intermediate page");
 
         List<PaymentRecord> payments = new ArrayList<>();
         Instant importedAt = Instant.now();
@@ -149,16 +145,17 @@ public final class TebexClient {
             try {
                 parsePayment(element.getAsJsonObject(), importedAt).ifPresent(payments::add);
             } catch (Exception ex) {
+                if (ex instanceof TebexException invalidDate) throw invalidDate;
                 skipped++;
             }
         }
         if (skipped > 0) {
             logger.warning("Skipped " + skipped + " Tebex payments with missing or invalid public player data.");
         }
-        return new PageResult(payments, hasNext);
+        return new PageResult(payments, hasNext, current);
     }
 
-    private Optional<PaymentRecord> parsePayment(JsonObject object, Instant importedAt) throws Exception {
+    Optional<PaymentRecord> parsePayment(JsonObject object, Instant importedAt) throws Exception {
         String rawId = stringValue(object, "id").orElse("");
         if (rawId.isBlank()) {
             return Optional.empty();
@@ -186,7 +183,8 @@ public final class TebexClient {
             currency = stringValue(object.getAsJsonObject("currency"), "iso_4217").orElse("");
         }
 
-        Instant createdAt = parseInstant(stringValue(object, "date").orElse(null)).orElse(importedAt);
+        Optional<Instant> createdAt = parseInstant(stringValue(object, "date").orElse(null));
+        if (createdAt.isEmpty()) throw new TebexException("Tebex payment date was missing or invalid");
         return Optional.of(new PaymentRecord(
                 hashId(rawId),
                 uuid.get(),
@@ -194,7 +192,7 @@ public final class TebexClient {
                 amount,
                 currency,
                 status,
-                createdAt,
+                createdAt.get(),
                 invalidStatus,
                 isManualPayment(object),
                 packageIds(object),
@@ -288,11 +286,7 @@ public final class TebexClient {
         return status == null ? "" : status.trim().toLowerCase(Locale.ROOT).replace(" ", "_");
     }
 
-    private boolean isNullOrBlank(JsonObject object, String key) {
-        return stringValue(object, key).map(String::isBlank).orElse(true);
-    }
-
-    private record PageResult(List<PaymentRecord> payments, boolean hasNextPage) {
+    record PageResult(List<PaymentRecord> payments, boolean hasNextPage, int currentPage) {
     }
 
     public static final class TebexException extends RuntimeException {

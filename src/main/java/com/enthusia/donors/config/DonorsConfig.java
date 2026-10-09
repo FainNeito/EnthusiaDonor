@@ -42,4 +42,12 @@ public record DonorsConfig(
         boolean fakeDataEnabled,
         int fakePlayerCount
 ) {
+    public DonorsConfig withSharedDisplay(ZoneId zone,String symbol,boolean cents,int size,String emptyName,String emptyAmount,String emptyRank) {
+        return new DonorsConfig(tebexApiKey,refreshIntervalMinutes,timeoutSeconds,maxRetries,maxPages,countingSource,
+                countZeroDollarPayments,countManualPayments,countRefundedPayments,countChargebackPayments,
+                includedPackageIds,excludedPackageIds,excludedTransactionIds,excludedPaymentIdHashes,
+                zone,symbol,cents,size,emptyName,emptyAmount,emptyRank,useSqlite,saveJsonExport,jsonExportPath,
+                r2UploadEnabled,r2AccountId,r2Endpoint,r2AccessKeyId,r2SecretAccessKey,r2Bucket,r2ObjectPath,r2IndexObjectPath,
+                exposeRawPaymentData,hashPaymentIds,fakeDataEnabled,fakePlayerCount);
+    }
 }

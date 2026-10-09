@@ -60,6 +60,8 @@ public final class DonorCache {
     public void markCacheOnly() {
         state = RefreshState.CACHE_ONLY;
     }
+    public void markNetworkFailure() {state=RefreshState.NETWORK_FAILED;lastError="Shared donor snapshot read failed";}
+    public void markNetworkMissing() {state=RefreshState.NETWORK_NOT_FOUND;lastError="No shared donor snapshot published";}
 
     public void markNotConfigured() {
         state = RefreshState.TEBEX_NOT_CONFIGURED;

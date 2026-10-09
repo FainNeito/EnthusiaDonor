@@ -122,10 +122,13 @@ public final class DonorRepository {
     }
 
     public List<DonorEntry> rebuildTotals(DonorsConfig config, Set<String> extraExcludedPaymentIdHashes) throws SQLException {
+        return rebuildTotals(config, extraExcludedPaymentIdHashes, Instant.now());
+    }
+
+    public List<DonorEntry> rebuildTotals(DonorsConfig config, Set<String> extraExcludedPaymentIdHashes, Instant updated) throws SQLException {
         ZoneId zone = config.timezone();
-        LocalDate monthStart = LocalDate.now(zone).withDayOfMonth(1);
+        LocalDate monthStart = updated.atZone(zone).toLocalDate().withDayOfMonth(1);
         long monthStartMillis = monthStart.atStartOfDay(zone).toInstant().toEpochMilli();
-        Instant updated = Instant.now();
 
         Map<UUID, MutableDonor> donors = new HashMap<>();
         try (Connection c = connect(); Statement s = c.createStatement(); ResultSet rs = s.executeQuery("""
@@ -179,7 +182,7 @@ public final class DonorRepository {
         return result;
     }
 
-    private boolean isCountable(
+    public static boolean isCountable(
             BigDecimal amount,
             String status,
             boolean refundedOrChargeback,
@@ -293,7 +296,7 @@ public final class DonorRepository {
         }
     }
 
-    private boolean intersects(Set<Integer> a, Set<Integer> b) {
+    private static boolean intersects(Set<Integer> a, Set<Integer> b) {
         for (Integer value : a) {
             if (b.contains(value)) {
                 return true;
