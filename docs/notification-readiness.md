@@ -36,6 +36,26 @@ send announcements or replay purchases during preparation.
 
 ## Preparation sequence
 
+### Current preparation update
+
+The dedicated `s109538_enthusiadonors` database and generated login now exist,
+with Connections From restricted to the shared backend/proxy allocation address.
+An authenticated workspace probe was rejected with SQLState 28000/code 1698
+because the workstation address differs. Backend/proxy egress and TLS session
+verification remain pending. No address restriction was widened.
+
+The private backend/proxy pair is encrypted with Windows DPAPI outside Git.
+It shares the database, source and signing key; notifications/relay stay disabled.
+Existing smp-chatter webhook metadata was checked again without sending a message.
+Schema has not been applied and live plugin files have not changed.
+
+Test.16 preserves canonical main's legacy runtime by default and packages its
+exporters and command adapter. The new adapter requires `runtime.mode: donor-network`
+in the prepared backend overlay. A config.yml with no runtime mode keeps legacy
+behavior, so test.15-to-test.16 replacement requires that explicit setting.
+`network.initialize-schema: false` avoids publisher DDL after provisioning;
+missing settings preserve the previous automatic initialization behavior.
+
 1. Obtain approval for the dedicated database/generated login. Inspect host TLS
    support and backend/proxy reachability. Do not disable certificate validation.
 2. Provision schema using ops/donor-schema.sql against that dedicated database.

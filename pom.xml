@@ -2,7 +2,7 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
  <modelVersion>4.0.0</modelVersion>
- <groupId>com.enthusia</groupId><artifactId>EnthusiaDonors</artifactId><version>1.1.0-test.15</version><packaging>jar</packaging>
+ <groupId>com.enthusia</groupId><artifactId>EnthusiaDonors</artifactId><version>1.1.0-test.16</version><packaging>jar</packaging>
  <name>EnthusiaDonors Test</name><description>Official donor displays with isolated donation and broadcast testing.</description>
  <properties><maven.compiler.release>21</maven.compiler.release><project.build.sourceEncoding>UTF-8</project.build.sourceEncoding></properties>
  <repositories>
@@ -23,7 +23,7 @@
   <plugins>
    <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-compiler-plugin</artifactId><version>3.13.0</version><configuration><release>21</release></configuration></plugin>
    <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-surefire-plugin</artifactId><version>3.5.2</version><configuration><useModulePath>false</useModulePath></configuration></plugin>
-   <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-jar-plugin</artifactId><version>3.4.1</version><configuration><archive><compress>false</compress></archive><includes><include>com/enthusia/donors/EnthusiaDonorsPlugin.class</include><include>com/enthusia/donors/sandbox/**</include><include>com/enthusia/donors/network/**</include><include>com/enthusia/donors/relay/**</include><include>com/enthusia/donors/cache/PlayerStatCache*.class</include><include>com/enthusia/donors/cache/DonorCache*.class</include><include>com/enthusia/donors/config/ConfigManager.class</include><include>com/enthusia/donors/config/DonorsConfig.class</include><include>com/enthusia/donors/model/PlayerStatEntry.class</include><include>com/enthusia/donors/model/DonorEntry.class</include><include>com/enthusia/donors/model/PaymentRecord.class</include><include>com/enthusia/donors/model/RefreshState.class</include><include>com/enthusia/donors/service/PlayerStatService*.class</include><include>com/enthusia/donors/storage/PlayerStatRepository*.class</include><include>com/enthusia/donors/storage/DonorRepository*.class</include><include>com/enthusia/donors/tebex/TebexClient*.class</include><include>plugin.yml</include><include>testing.yml</include><include>config.yml</include></includes></configuration></plugin>
+   <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-jar-plugin</artifactId><version>3.4.1</version><configuration><archive><compress>false</compress></archive><includes><include>com/enthusia/donors/**</include><include>plugin.yml</include><include>testing.yml</include><include>config.yml</include></includes></configuration></plugin>
   </plugins>
  </build>
 </project>

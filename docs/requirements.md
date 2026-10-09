@@ -29,6 +29,22 @@ The test.6 JAR shows raw `%enthusiadonors_*%` tokens on donor and kill/death hol
 - Reject negative, malformed, sub-cent, or overflowing configuration values. Read this policy from config.yml at startup; restart to apply changes.
 - Apply the rule to both explicit test month closure and virtual-clock advancement. Official Tebex month finalization remains pending and must use this same policy when connected.
 
+## Publisher schema privileges
+
+- When runtime.mode is absent or legacy, the plugin shall retain the original
+  leaderboard/export/command runtime. Donor-network displays and announcements
+  shall require explicit runtime.mode: donor-network.
+- When runtime.mode is invalid, or real notifications/shared snapshots are
+  configured in legacy mode, startup shall reject the incompatible configuration.
+
+- When network.initialize-schema is false, the publisher shall register its
+  source in pre-provisioned tables without issuing CREATE TABLE statements.
+- When that option is absent or the legacy NetworkSettings constructor is used,
+  the publisher shall preserve its existing automatic schema initialization.
+- When publisher tables are missing and initialization is disabled, the publisher
+  shall retain cached data and report initialization failure; it shall not silently
+  create schema or claim readiness.
+
 ## Verification boundary
 
 The shared data contract is in [network-data.md](network-data.md). The signed Velocity announcement/outbox contract and delivery uncertainty policy are in [proxy-relay.md](proxy-relay.md). Both are opt-in test features; real Tebex event ingestion and payment-transaction announcements remain separate ledger work.

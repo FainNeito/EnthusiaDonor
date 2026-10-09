@@ -13,6 +13,11 @@
 
 ## Architecture and activation
 
+Test.16 requires `runtime.mode: donor-network`. Its default legacy runtime retains
+the original command/export path. Configure `network.initialize-schema: false`
+alongside the existing relay/notification schema flags after provisioning. A
+test.15 config lacking runtime mode must receive the explicit opt-in at cutover.
+
 Authenticated complete Tebex poll -> shared observations + immutable outbox -> signed relay publication -> Velocity network chat; a separate durable Discord job uses the existing smp-chatter webhook. Delivery follows the configured official refresh interval (not an instant webhook push). No incoming public HTTP port is needed. Existing sandbox previews remain isolated.
 
 Before later activation, configure a shared source and database, publisher/relay identities and signing key, schema privileges/provisioning, Discord webhook and optional store URL. Backend and proxy must agree on relay source/key/database. Keep all historical observation/outbox tables across upgrades. Inspect uncertain delivery receipts before any manual resend. Official Glorious finalization and permission grants remain separate work.

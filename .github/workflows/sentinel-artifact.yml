@@ -36,6 +36,10 @@ jobs:
           test "${#jars[@]}" -eq 1
           cp "${jars[0]}" plugin.jar
           jar tf plugin.jar | grep -Fxq 'plugin.yml'
+          jar tf plugin.jar | grep -Fxq 'com/enthusia/donors/infrastructure/LegacyRuntime.class'
+          jar tf plugin.jar | grep -Fxq 'com/enthusia/donors/export/R2UploadService.class'
+          jar tf plugin.jar | grep -Fxq 'com/enthusia/donors/export/JsonExportService.class'
+          jar tf plugin.jar | grep -Fxq 'com/enthusia/donors/command/DonorCommand.class'
           mapfile -t proxy_jars < <(find velocity-relay/target -maxdepth 1 -type f -name 'EnthusiaDonors-VelocityRelay-*.jar' ! -name 'original-*' -print | sort)
           test "${#proxy_jars[@]}" -eq 1
           cp "${proxy_jars[0]}" velocity-relay.jar

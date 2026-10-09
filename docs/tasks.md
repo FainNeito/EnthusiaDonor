@@ -2,6 +2,13 @@
 
 ## Real purchase incident — 2026-10-09
 
+- [x] Create approved dedicated database; keep restricted source address.
+- [x] Prepare encrypted private backend/proxy pair; recheck smp-chatter metadata.
+- [x] Review findings: add opt-in no-DDL publisher setup and preserve the default
+  legacy runtime/exporters with an explicit donor-network choice (test.16).
+- [ ] Confirm backend/proxy SQL access and TLS; workspace access was rejected.
+- [ ] Provision schema from reviewed merged source and complete later activation.
+
 - [x] Identify live configuration gap: real notifications default off; proxy
   relay disabled/unconfigured. Backend test.15 loaded; Tebex entitlement grant ran.
 - [x] Prepare schema and Paper/Velocity CI coverage on Java 21/25 for review.

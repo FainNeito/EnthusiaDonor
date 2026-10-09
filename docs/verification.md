@@ -1,5 +1,36 @@
 # Official donor display test.11 verification
 
+## Reviewed preparation — test.16
+
+- Findings addressed: the publisher can register against externally provisioned
+  schema with network.initialize-schema=false; missing configuration and the old
+  NetworkSettings constructor retain automatic initialization. Legacy startup
+  routing and packaged exporters/commands preserve canonical main's runtime;
+  the newer adapter requires runtime.mode=donor-network. Invalid modes and
+  incompatible legacy/network configuration fail before new workers start.
+- SPEAR red: publisher-schema-red.log failed compilation before the new config
+  accessor/initialization overload existed. Focused green: 13 tests. The first
+  fixture denied SELECT statement creation too; it was corrected to deny CREATE
+  operations while permitting reads. runtime-mode-red.log failed compilation
+  before routing types existed; runtime-mode-green.log passed 15 focused tests.
+- Final local clean verify: 205 tests, zero failures/errors/skips
+  (test16-backend-build.log); proxy clean verify passed (test16-proxy-build.log).
+- JAR audit: LegacyRuntime, R2UploadService, JsonExportService and DonorCommand
+  are packaged in the backend again. Proxy retains its independent shaded build.
+- Local unmerged Paper SHA-256: 40697BDBC8EA3AC5056F927DB28C6851AC2831963E59903C1487A6FBFCDA4341.
+  Local unmerged Velocity SHA-256: D10FD636CB9B28AD01796AD9E4426B5B8A0CC146E8147AA4B326566D2F2C5BEA.
+  Neither is a production artifact or staged file.
+- The authenticated workspace SQL probe was denied by the source-host restriction
+  (SQLState 28000, code 1698). This proves rejected workspace access only, not
+  successful backend/proxy SQL connectivity or an established TLS session.
+- Private configuration is DPAPI-encrypted outside Git, with matching source,
+  database and signing settings. Notifications/relay remain disabled; smp-chatter
+  webhook metadata verified through a read-only GET, with no message sent.
+- No schema applied, production plugin file changed, merge, restart/reload,
+  activation or payment replay. No project-local EARS/state helper exists.
+- Exact-head GitHub checks and review records must be inspected after this update;
+  earlier Java 21/25 success for f5dfee11 does not verify the test.16 head.
+
 ## Notification readiness — 2026-10-09
 
 - Fetched canonical main again: eede9199d0ff6156ec4a6b05e46f1749e60f3eb4.

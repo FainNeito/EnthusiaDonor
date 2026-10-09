@@ -46,7 +46,7 @@ public final class SharedDonorSnapshots implements AutoCloseable {
                     apply(SnapshotRead.found(NetworkSnapshot.parse(Files.readString(cacheFile))),false);
             } catch(Exception error) {logger.warning("Local shared snapshot cache could not be loaded; preserved for inspection.");}
             if(settings.mode()==NetworkSettings.Mode.PUBLISHER) {
-                try {store.initPublisher();initialized=true;renewLease();}
+                try {store.initPublisher(settings.initializeSchema());initialized=true;renewLease();}
                 catch(Exception error) {ownsLease.set(false);logger.warning("Shared publisher initialization failed; shared displays retain their cache.");}
                 worker.scheduleWithFixedDelay(this::renewLease,settings.leaseSeconds()/3,settings.leaseSeconds()/3,TimeUnit.SECONDS);
             }
@@ -57,7 +57,7 @@ public final class SharedDonorSnapshots implements AutoCloseable {
     private void renewLease() {
         if(closed)return;
         try {
-            if(!initialized) {store.initPublisher();initialized=true;}
+            if(!initialized) {store.initPublisher(settings.initializeSchema());initialized=true;}
             boolean acquired=store.acquireLease(bootToken,settings.leaseSeconds()*1000L);
             leaseEpoch=acquired?store.leaseEpoch(bootToken):0;ownsLease.set(leaseEpoch>0);
         } catch(Exception error) {leaseEpoch=0;ownsLease.set(false);}

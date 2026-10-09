@@ -2,6 +2,11 @@
 
 ## Contract
 
+Test.16 requires `runtime.mode: donor-network` for the opt-in adapter. Configure
+`network.initialize-schema: false` after externally provisioning the projection
+table; the publisher still registers the source through INSERT. Missing settings
+retain automatic table initialization. Legacy runtime remains the default.
+
 - When `network.mode` is `standalone`, the existing official Tebex read behavior shall remain available.
 - When mode is `publisher`, only the process holding an unexpired database lease shall publish an official Tebex snapshot. The database shall atomically advance a revision and replace the complete public projection.
 - When mode is `reader`, the backend shall perform only shared snapshot reads and local cache writes; it shall never call Tebex or create/modify shared database tables.

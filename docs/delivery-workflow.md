@@ -51,6 +51,12 @@ workflow, so a new failing test is not applicable to that documentation step.
 
 ## Open delivery work
 
+Test.16 updates: publisher initialization can avoid DDL; legacy startup/export
+behavior is restored by default and included in the JAR. The newer adapter must
+be explicitly selected with runtime.mode=donor-network. Both local builds and
+205 backend tests pass. The dedicated restricted database exists, but local SQL
+access is denied and server-side access/schema provisioning remain pending.
+
 - Review accumulated source and update stale task/evidence wording.
 - Add canonical proxy CI/release coverage and establish runtime compatibility.
 - Verify official rankings against Tebex and PlaceholderAPI/hologram behavior.

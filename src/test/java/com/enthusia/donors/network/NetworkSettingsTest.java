@@ -5,6 +5,13 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class NetworkSettingsTest {
+    @Test void publisherSchemaInitializationPreservesDefaultsAndCanBeDisabled() {
+        var config=new YamlConfiguration();
+        assertTrue(NetworkSettings.load(config).initializeSchema());
+        assertTrue(new NetworkSettings(NetworkSettings.Mode.STANDALONE,"test","","","",15,60,1200).initializeSchema());
+        config.set("network.initialize-schema",false);
+        assertFalse(NetworkSettings.load(config).initializeSchema());
+    }
     @Test void absentNetworkConfigPreservesStandalone() {
         var settings=NetworkSettings.load(new YamlConfiguration());
         assertEquals(NetworkSettings.Mode.STANDALONE,settings.mode());

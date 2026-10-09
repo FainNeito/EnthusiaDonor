@@ -12,8 +12,14 @@ public final class JdbcProjectionStore {
         this.connections=connections;this.source=source;this.dialect=dialect;
     }
     public void initPublisher() throws SQLException {
+        initPublisher(true);
+    }
+    public void initPublisher(boolean initializeSchema) throws SQLException {
+        if(initializeSchema)
         try(Connection c=connections.open();Statement s=c.createStatement()) {
             s.executeUpdate("CREATE TABLE IF NOT EXISTS enthusiadonors_test_projection (source_id VARCHAR(64) PRIMARY KEY,revision BIGINT NOT NULL,owner_token VARCHAR(64),lease_until BIGINT NOT NULL,lease_epoch BIGINT NOT NULL,payload "+(dialect==Dialect.MARIADB?"MEDIUMTEXT":"TEXT")+")"+(dialect==Dialect.MARIADB?" ENGINE=InnoDB":""));
+        }
+        try(Connection c=connections.open()) {
             String insert=dialect==Dialect.MARIADB?"INSERT IGNORE INTO":"INSERT OR IGNORE INTO";
             try(PreparedStatement p=c.prepareStatement(insert+" enthusiadonors_test_projection(source_id,revision,owner_token,lease_until,lease_epoch,payload) VALUES (?,0,NULL,0,0,NULL)")) {
                 p.setString(1,source);p.executeUpdate();

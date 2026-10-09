@@ -1,5 +1,8 @@
 # Monthly #1 donor must meet this monthly total to earn Glorious.
 # Inclusive minimum in the donation currency; restart after changes.
+runtime:
+  mode: legacy # legacy preserves original exports/commands; donor-network explicitly opts into the new adapter.
+
 glorious:
   minimum-monthly-donation: "30.00"
 
@@ -42,6 +45,7 @@ relay:
 # One publisher gets the Tebex key; readers can leave tebex.api-key blank.
 # Reader database users need SELECT only; the publisher creates/writes the test projection table.
 network:
+  initialize-schema: true # Legacy default; set false after external schema provisioning.
   mode: standalone # standalone | publisher | reader; restart after changes
   source-id: enthusia-donors-test
   jdbc-url: '' # jdbc:mariadb://host:3306/donors_test?sslMode=verify-full

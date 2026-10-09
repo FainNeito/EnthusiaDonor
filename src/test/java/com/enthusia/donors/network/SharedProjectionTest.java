@@ -13,6 +13,35 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class SharedProjectionTest {
     @TempDir Path temporary;
+    @Test void preprovisionedPublisherRegistersWithoutSchemaPrivileges() throws Exception {
+        store("provisioner").initPublisher();
+        String url="jdbc:sqlite:"+temporary.resolve("shared.db");
+        var publisher=new JdbcProjectionStore(() -> {
+            var actual=DriverManager.getConnection(url);
+            return (java.sql.Connection)java.lang.reflect.Proxy.newProxyInstance(getClass().getClassLoader(),
+                    new Class<?>[]{java.sql.Connection.class},(proxy,method,args) -> {
+                        if(method.getName().equals("createStatement")) {
+                            var statement=actual.createStatement();
+                            return java.lang.reflect.Proxy.newProxyInstance(getClass().getClassLoader(),
+                                    new Class<?>[]{java.sql.Statement.class},(statementProxy,statementMethod,statementArgs) -> {
+                                        if(statementArgs!=null && statementArgs.length>0 && statementArgs[0] instanceof String sql
+                                                && sql.trim().toUpperCase(Locale.ROOT).startsWith("CREATE"))
+                                            throw new java.sql.SQLException("Schema privileges denied");
+                                        try {return statementMethod.invoke(statement,statementArgs);}
+                                        catch(java.lang.reflect.InvocationTargetException failure) {throw failure.getCause();}
+                                    });
+                        }
+                        try {return method.invoke(actual,args);}
+                        catch(java.lang.reflect.InvocationTargetException failure) {throw failure.getCause();}
+                    });
+        },"test-network",JdbcProjectionStore.Dialect.SQLITE);
+        publisher.initPublisher(false);
+        assertTrue(publisher.acquireLease("writer",60_000));
+        assertEquals(1,publisher.publish("writer",draft("Ready")).revision());
+    }
+    @Test void preprovisionedPublisherFailsWhenSchemaIsMissing() {
+        assertThrows(java.sql.SQLException.class,() -> store("test-network").initPublisher(false));
+    }
     private JdbcProjectionStore store(String source) {
         String url="jdbc:sqlite:"+temporary.resolve("shared.db");
         return new JdbcProjectionStore(() -> DriverManager.getConnection(url),source,JdbcProjectionStore.Dialect.SQLITE);
