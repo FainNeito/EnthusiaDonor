@@ -7,5 +7,8 @@ public enum RefreshState {
     TEBEX_NOT_CONFIGURED,
     TEBEX_FAILED,
     CACHE_ONLY,
-    TEST_DATA
+    TEST_DATA,
+    NETWORK_FAILED,
+    NETWORK_NOT_FOUND,
+    NETWORK_STALE
 }

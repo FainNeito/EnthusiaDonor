@@ -1,3 +1,25 @@
+# Monthly #1 donor must meet this monthly total to earn Glorious.
+# Inclusive minimum in the donation currency; restart after changes.
+runtime:
+  mode: legacy # legacy preserves original exports/commands; donor-network explicitly opts into the new adapter.
+
+glorious:
+  minimum-monthly-donation: "30.00"
+
+# Real Tebex notifications, separate from testing.yml previews. Restart after changes.
+# Requires network.mode=publisher and a matching enabled relay for network chat.
+# First complete sync establishes history; only subsequent new payments announce.
+notifications:
+  enabled: false
+  initialize-schema: false # Provision notify tables, or enable once with publisher schema privileges
+  chat-enabled: true
+  show-amounts: false
+  store-url: ''
+  discord:
+    enabled: true
+    channel-label: smp-chatter # Documentation only; the webhook determines the actual channel
+    webhook-url: '' # Existing smp-chatter webhook; keep private and out of Git
+
 tebex:
   api-key: ""
   refresh-interval-minutes: 10
@@ -5,6 +27,33 @@ tebex:
   max-retries: 3
   max-pages: 1000
   count-taxes-fees-if-available: true
+
+# Opt-in durable test announcements. Restart after changes.
+relay:
+  enabled: false
+  source-id: enthusia-donors-test
+  backend-id: '' # Unique lowercase backend name, e.g. survival-test
+  jdbc-url: '' # Dedicated test DB, e.g. jdbc:mariadb://host:3306/donors_test?sslMode=verify-full
+  username: '' # Separate event producer account; do not reuse SELECT-only snapshot reader
+  password: ''
+  signing-key: '' # Same random key (at least 32 bytes) as Velocity relay; never a Tebex key
+  poll-seconds: 2
+  expiry-seconds: 300
+  initialize-schema: false # Provision tables separately, or enable once with test schema privileges
+
+# Opt-in shared public snapshots. Use a SEPARATE MariaDB test database.
+# One publisher gets the Tebex key; readers can leave tebex.api-key blank.
+# Reader database users need SELECT only; the publisher creates/writes the test projection table.
+network:
+  initialize-schema: true # Legacy default; set false after external schema provisioning.
+  mode: standalone # standalone | publisher | reader; restart after changes
+  source-id: enthusia-donors-test
+  jdbc-url: '' # jdbc:mariadb://host:3306/donors_test?sslMode=verify-full
+  username: ''
+  password: ''
+  poll-seconds: 15
+  lease-seconds: 60
+  max-snapshot-age-seconds: 1200
 
 counting:
   source: "tebex_payments_only"

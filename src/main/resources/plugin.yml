@@ -1,30 +1,33 @@
 name: EnthusiaDonors
-version: ${version}
+version: '${project.version}'
 main: com.enthusia.donors.EnthusiaDonorsPlugin
-api-version: "1.20"
+api-version: '1.21'
 author: Enthusia
-softdepend:
-  - PlaceholderAPI
+description: Official Tebex donor displays and opt-in payment announcements with isolated test controls. Does not grant donation entitlements.
+softdepend: [PlaceholderAPI]
+libraries:
+  - org.mariadb.jdbc:mariadb-java-client:3.4.1
+  - org.xerial:sqlite-jdbc:3.49.1.0
+  - com.google.code.gson:gson:2.11.0
 commands:
   enthusiadonors:
-    description: Manage EnthusiaDonors donor leaderboards.
-    usage: /enthusiadonors <reload|refresh|status|top|debug>
-    aliases:
-      - edonors
+    description: EnthusiaDonors sandbox administration.
+    usage: /enthusiadonors test menu
+    aliases: [edonors]
+    permission: enthusiadonors.test
+  donors:
+    description: View official Tebex donor leaderboards and public profiles.
+    usage: /donors [monthly|alltime|me|profile|directory|glorious]
+    permission: enthusiadonors.view
 permissions:
+  enthusiadonors.view:
+    description: View public-safe official Tebex donor menus.
+    default: true
+  enthusiadonors.test:
+    description: Simulate and manage isolated test donations. Never grant to normal players.
+    default: op
   enthusiadonors.admin:
-    description: Allows all EnthusiaDonors admin commands.
     default: op
     children:
-      enthusiadonors.reload: true
-      enthusiadonors.refresh: true
-      enthusiadonors.status: true
-      enthusiadonors.debug: true
-  enthusiadonors.reload:
-    default: op
-  enthusiadonors.refresh:
-    default: op
-  enthusiadonors.status:
-    default: op
-  enthusiadonors.debug:
-    default: op
+      enthusiadonors.test: true
+      enthusiadonors.view: true

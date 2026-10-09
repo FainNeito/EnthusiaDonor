@@ -1,0 +1,34 @@
+# Merge these sections into the existing config only at approved cutover.
+# Disabled preparation profile; preserve existing Tebex key/counting/timezone.
+runtime:
+  mode: donor-network
+network:
+  initialize-schema: false
+  mode: standalone # Change to publisher at approved activation.
+  source-id: enthusia-donors
+  jdbc-url: 'jdbc:mariadb://DATABASE_HOST:3306/DONOR_DATABASE?sslMode=verify-full'
+  username: SET_PUBLISHER_USERNAME_LOCALLY
+  password: SET_PASSWORD_LOCALLY
+  poll-seconds: 15
+  lease-seconds: 60
+  max-snapshot-age-seconds: 1200
+relay:
+  enabled: false
+  source-id: enthusia-donors
+  backend-id: smp
+  jdbc-url: 'jdbc:mariadb://DATABASE_HOST:3306/DONOR_DATABASE?sslMode=verify-full'
+  username: SET_PRODUCER_USERNAME_LOCALLY
+  password: SET_PASSWORD_LOCALLY
+  signing-key: SET_SHARED_RANDOM_KEY_LOCALLY
+  poll-seconds: 2
+  expiry-seconds: 300
+  initialize-schema: false
+notifications:
+  enabled: false
+  chat-enabled: true
+  show-amounts: false
+  store-url: ''
+  initialize-schema: false
+  discord:
+    enabled: true
+    webhook-url: '' # Existing smp-chatter webhook; set privately.

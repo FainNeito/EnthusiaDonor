@@ -15,6 +15,8 @@ import java.util.stream.Collectors;
 public final class ConfigManager {
     private final JavaPlugin plugin;
     private volatile DonorsConfig config;
+    private com.enthusia.donors.sandbox.GloriousPolicy glorious;
+    private com.enthusia.donors.network.NetworkSettings network;
 
     public ConfigManager(JavaPlugin plugin) {
         this.plugin = plugin;
@@ -24,6 +26,8 @@ public final class ConfigManager {
         plugin.saveDefaultConfig();
         plugin.reloadConfig();
         FileConfiguration c = plugin.getConfig();
+        glorious=com.enthusia.donors.sandbox.GloriousPolicy.load(c);
+        network=com.enthusia.donors.network.NetworkSettings.load(c);
 
         ZoneId zone;
         String zoneName = c.getString("leaderboards.timezone", "America/Chicago");
@@ -96,6 +100,12 @@ public final class ConfigManager {
 
     public DonorsConfig get() {
         return config;
+    }
+    public com.enthusia.donors.sandbox.GloriousPolicy glorious() {return glorious;}
+    public com.enthusia.donors.network.NetworkSettings network() {return network;}
+    public synchronized void adoptSharedDisplay(ZoneId zone,String symbol,boolean cents,int size,String emptyName,String emptyAmount,String emptyRank) {
+        if(network.mode()==com.enthusia.donors.network.NetworkSettings.Mode.READER)
+            config=config.withSharedDisplay(zone,symbol,cents,size,emptyName,emptyAmount,emptyRank);
     }
 
     private Set<Integer> integerSet(FileConfiguration c, String path) {

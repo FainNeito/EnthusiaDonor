@@ -11,30 +11,49 @@ jobs:
   artifact:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    strategy:
+      matrix:
+        java: ['21', '25']
     steps:
       - name: Checkout exact pull-request head
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
-      - name: Set up Java 21
+      - name: Set up Java
         uses: actions/setup-java@3a4f6e1af504cf6a31855fa899c6aa5355ba6c12
         with:
           distribution: temurin
-          java-version: '21'
+          java-version: ${{ matrix.java }}
           cache: maven
       - name: Build deployable plugin
         run: mvn --batch-mode --no-transfer-progress clean verify
+      - name: Build Velocity relay
+        run: mvn --batch-mode --no-transfer-progress -f velocity-relay/pom.xml clean verify
       - name: Stage stable Sentinel artifact
         run: |
           mapfile -t jars < <(find target -maxdepth 1 -type f -name 'EnthusiaDonors-*.jar' ! -name 'original-*' ! -name '*-sources.jar' ! -name '*-javadoc.jar' -print | sort)
           test "${#jars[@]}" -eq 1
           cp "${jars[0]}" plugin.jar
           jar tf plugin.jar | grep -Fxq 'plugin.yml'
+          jar tf plugin.jar | grep -Fxq 'com/enthusia/donors/infrastructure/LegacyRuntime.class'
+          jar tf plugin.jar | grep -Fxq 'com/enthusia/donors/export/R2UploadService.class'
+          jar tf plugin.jar | grep -Fxq 'com/enthusia/donors/export/JsonExportService.class'
+          jar tf plugin.jar | grep -Fxq 'com/enthusia/donors/command/DonorCommand.class'
+          mapfile -t proxy_jars < <(find velocity-relay/target -maxdepth 1 -type f -name 'EnthusiaDonors-VelocityRelay-*.jar' ! -name 'original-*' -print | sort)
+          test "${#proxy_jars[@]}" -eq 1
+          cp "${proxy_jars[0]}" velocity-relay.jar
+          jar tf velocity-relay.jar | grep -Fxq 'velocity-plugin.json'
+          jar tf velocity-relay.jar | grep -Fxq 'org/mariadb/jdbc/Driver.class'
+          ! jar tf velocity-relay.jar | grep -q '^com/enthusia/donors/sandbox/'
+          sha256sum plugin.jar velocity-relay.jar > SHA256SUMS
       - name: Upload Sentinel artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: enthusiadonor-sentinel-paper
-          path: plugin.jar
+          name: enthusiadonor-sentinel-java-${{ matrix.java }}
+          path: |
+            plugin.jar
+            velocity-relay.jar
+            SHA256SUMS
           if-no-files-found: error
           retention-days: 14
