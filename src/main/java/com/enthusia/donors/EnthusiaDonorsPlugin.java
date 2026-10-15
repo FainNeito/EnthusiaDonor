@@ -8,16 +8,22 @@ import org.bukkit.plugin.java.JavaPlugin;
 /** Original runtime by default; donor-network adapters require explicit operator opt-in. */
 public final class EnthusiaDonorsPlugin extends JavaPlugin {
     private AutoCloseable runtime;
+    private com.enthusia.donors.infrastructure.entitlement.ReconciliationLifecycle entitlements;
     @Override public void onEnable(){
         try {
             saveDefaultConfig();reloadConfig();
             if(RuntimeMode.load(getConfig())==RuntimeMode.LEGACY) {
                 var legacy=new LegacyRuntime(this);runtime=legacy;legacy.start();
             } else runtime=new TestRuntime(this);
+            entitlements=new com.enthusia.donors.infrastructure.entitlement.ReconciliationLifecycle(this);
+            entitlements.start();
         } catch(Exception ex) {
             getLogger().severe("Donor runtime initialization failed; inspect configuration and server dependencies. Secrets were not logged.");
             getServer().getPluginManager().disablePlugin(this);
         }
     }
-    @Override public void onDisable(){if(runtime!=null)try {runtime.close();}catch(Exception stopped){getLogger().warning("Donor runtime shutdown failed; inspect retained data before restarting.");}}
+    @Override public void onDisable(){
+        if(entitlements!=null)entitlements.close();
+        if(runtime!=null)try {runtime.close();}catch(Exception stopped){getLogger().warning("Donor runtime shutdown failed; inspect retained data before restarting.");}
+    }
 }

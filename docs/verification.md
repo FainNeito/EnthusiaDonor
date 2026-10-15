@@ -1,5 +1,35 @@
 # Official donor display test.11 verification
 
+## Missed expiry reconciliation — test.17 (unmerged local review artifact)
+
+- Base: canonical main 3c50f93486464dc8b90dd04345ee0101cdcd1254, fetched
+  2026-10-15; isolated codex/devotee-reconciliation worktree.
+- Genuine new-test red: ReconciliationTest compilation failed before policy/store
+  types existed (reconciliation-red.log). Final Java 25 clean verify: 249 tests,
+  zero failures/errors/skips, including 44 new entitlement tests. Velocity clean
+  verify passed without proxy source/version changes.
+- Source adapter was exercised read-only against real Tebex/Mojang: five reviewed
+  paid accounts INACTIVE, two ACTIVE, two UNKNOWN. No LuckPerms mutation adapter
+  was loaded by that probe. ChrisD34 was excluded because manual cleanup was
+  already confirmed. These source classifications are not fresh rank writes or
+  subscription lifecycle status claims.
+- Actual live SMP LuckPerms-Bukkit-5.5.85.jar SHA-256
+  dc637ce18f48d3b75a7ffd1784b85be16a627359090dfe5adf15dab6d145dc7d.
+  All 141 compile API 5.4 method descriptors checked across 17 used interfaces
+  exist in the live JAR. Optional startup/stop with all LuckPerms classes denied
+  by an isolated classloader passes.
+- Local backend test artifact: target/EnthusiaDonors-1.1.0-test.17.jar,
+  SHA-256 0a362307894a95ba04039f52dcd2f6a66b401acccc9982551ddb69fe5276899a.
+  This is not a merged production artifact and has not been uploaded.
+- Adapter remains disabled, defaults to audit, and must have one enforcement
+  owner. Its optional real permission writes are separate from sandbox actions;
+  earlier historical statements about this JAR excluding all LuckPerms writes
+  do not describe this new opt-in adapter.
+- Pending: exact-head hosted checks/review, isolated live enforcement including
+  offline/renewal/overlap/save-failure acceptance, merged-source release and any
+  later authorized staging/activation. No server config, ranks, SQL, restart,
+  reload, message or subscription was modified by this implementation.
+
 ## Reviewed preparation — test.16
 
 - Findings addressed: the publisher can register against externally provisioned

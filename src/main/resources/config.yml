@@ -6,6 +6,22 @@ runtime:
 glorious:
   minimum-monthly-donation: "30.00"
 
+# Optional missed-expiry reconciliation. Enable on ONE Paper backend only.
+# Separate from sandbox simulations; disabled/audit by default. Restart to activate.
+# Requires reviewed configuration and real audit/isolated enforcement acceptance.
+entitlements:
+  enabled: false
+  mode: audit # audit | enforce
+  delivery-server-id: 0 # Explicit ID from Tebex /information; Enthusia is 2147009.
+  devotee-package-ids: [] # All Devotee subscription package IDs; store's current ID is 7053397.
+  check-interval-minutes: 15
+  confirmation-minutes: 60 # At least two successful checks; minimum 15 minutes.
+  timeout-seconds: 10
+  max-users: 100
+  max-history-per-user: 100
+  protected-groups: [founder, avid-founder, devotee-founder, media, glorious]
+  protected-uuids: [] # Additional permanent/manual exceptions, using Minecraft UUIDs.
+
 # Real Tebex notifications, separate from testing.yml previews. Restart after changes.
 # Requires network.mode=publisher and a matching enabled relay for network chat.
 # First complete sync establishes history; only subsequent new payments announce.

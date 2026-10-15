@@ -1,5 +1,25 @@
 # EnthusiaDonor Tasks
 
+## Missed Devotee expiry reconciliation — 2026-10-15
+
+- [x] Fetch canonical main and isolate `codex/devotee-reconciliation` from 3c50f934.
+- [x] Specify official non-expired-package authority, paid-history and identity
+  proof, repeated checks, higher-rank protection and failure boundaries in
+  [devotee-reconciliation.md](devotee-reconciliation.md).
+- [x] Implement disabled-by-default audit/enforce adapter on one Paper backend;
+  preserve sandbox isolation and existing Tebex purchase/expiry commands.
+- [x] Read-only real-source probe: five INACTIVE, two ACTIVE, two UNKNOWN among
+  reviewed direct holders excluding already-cleaned ChrisD34; no ranks changed.
+- [x] Local backend clean verify: 249 tests, no failures/errors/skips; Velocity
+  clean verify passed. Optional linking without LuckPerms passed.
+- [x] Actual SMP LuckPerms 5.5.85: 141 API method descriptors across 17 interfaces
+  remain compatible with compile API 5.4. This is binary evidence, not runtime
+  permission enforcement acceptance.
+- [ ] Inspect exact-head PR review/CI findings.
+- [ ] Merge, build from clean merged source, and stage only if authorized.
+- [ ] Isolated enforcement acceptance, then separately authorized activation;
+  no restart/reload is authorized. Local tests/probes are not live enforcement.
+
 ## Real purchase incident — 2026-10-09
 
 - [x] Create approved dedicated database; keep restricted source address.

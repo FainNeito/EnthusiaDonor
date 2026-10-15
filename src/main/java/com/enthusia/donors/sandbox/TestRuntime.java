@@ -71,7 +71,7 @@ public final class TestRuntime implements CommandExecutor,TabCompleter,Listener,
         plugin.getServer().getMessenger().registerOutgoingPluginChannel(plugin,ProxyChatBroadcast.CHANNEL);
         plugin.getServer().getPluginManager().registerEvents(menus,plugin);
         plugin.getServer().getPluginManager().registerEvents(this,plugin);
-        plugin.getLogger().warning("TEST BUILD: public donor displays read official Tebex payments; real announcements are opt-in. Sandbox previews are separate. R2 and LuckPerms writes remain disconnected.");
+        plugin.getLogger().warning("TEST BUILD: public donor displays read official Tebex payments; real announcements are opt-in. Sandbox actions never write LuckPerms. Independent entitlement reconciliation requires explicit configuration.");
         CompletableFuture.supplyAsync(() -> {
             try {return new SandboxEngine(new SandboxDatabase(plugin.getDataFolder().toPath().resolve("testing")),Instant.now(),settings.zone());}
             catch(Exception ex){throw new CompletionException(ex);}
@@ -399,7 +399,7 @@ public final class TestRuntime implements CommandExecutor,TabCompleter,Listener,
         reply(sender,"Official donors: "+officialDonors.cache().snapshot().alltime().size()+" | sandbox profiles: "+view().people().size()+" | sandbox payments: "+view().payments().size());
         reply(sender,"Shared donors: "+officialDonors.networkStatus());
         reply(sender,"Network relay: "+(relay==null?"DISABLED (legacy MessageRaw)":relay.status()));
-        reply(sender,"Official Tebex reads: "+officialDonors.cache().state()+" | R2 writes: DISCONNECTED | LuckPerms writes: DISCONNECTED");
+        reply(sender,"Official Tebex reads: "+officialDonors.cache().state()+" | Sandbox R2/LuckPerms writes: DISCONNECTED");
         reply(sender,"Real payment notifications: "+(paymentAnnouncements==null?"DISABLED":paymentAnnouncements.status()));
         reply(sender,"Discord: "+(settings.discordEnabled()&&!settings.discordUrl().isBlank()?"DEDICATED TEST WEBHOOK ENABLED":"DISABLED")+" | virtual clock is paused between test actions.");
     }
