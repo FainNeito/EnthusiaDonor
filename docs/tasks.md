@@ -15,7 +15,10 @@
 - [x] Actual SMP LuckPerms 5.5.85: 141 API method descriptors across 17 interfaces
   remain compatible with compile API 5.4. This is binary evidence, not runtime
   permission enforcement acceptance.
-- [ ] Inspect exact-head PR review/CI findings.
+- [x] Inspect implementation-head b5be5dd PR #3 checks: Java 21/25 artifact jobs
+  passed. Seven annotations concern existing runner/action/cache notices, not
+  source failures. No submitted/inline reviews; CodeRabbit skipped automatically
+  and requires a manual review trigger. Human/automated review remains pending.
 - [ ] Merge, build from clean merged source, and stage only if authorized.
 - [ ] Isolated enforcement acceptance, then separately authorized activation;
   no restart/reload is authorized. Local tests/probes are not live enforcement.

@@ -21,11 +21,19 @@
 - Local backend test artifact: target/EnthusiaDonors-1.1.0-test.17.jar,
   SHA-256 0a362307894a95ba04039f52dcd2f6a66b401acccc9982551ddb69fe5276899a.
   This is not a merged production artifact and has not been uploaded.
+- PR: https://github.com/FainNeito/EnthusiaDonor/pull/3, ready for review, not
+  merged. Implementation head b5be5dd049a0d71e4f303e1ecdefbda4af1e64bd passed
+  hosted Java 21 and 25 artifact jobs in run 38796877003 (backend and proxy).
+  Inspected all seven annotations: existing action Node runtime deprecation,
+  cold/duplicate caches and upcoming Ubuntu runner image notices. No source
+  failure findings. No submitted reviews or inline review comments. CodeRabbit
+  reported automatic review skipped for this OSS repository; this is not a
+  completed review or approval. This follow-up changes evidence documentation only.
 - Adapter remains disabled, defaults to audit, and must have one enforcement
   owner. Its optional real permission writes are separate from sandbox actions;
   earlier historical statements about this JAR excluding all LuckPerms writes
   do not describe this new opt-in adapter.
-- Pending: exact-head hosted checks/review, isolated live enforcement including
+- Pending: review and latest-head hosted checks, isolated live enforcement including
   offline/renewal/overlap/save-failure acceptance, merged-source release and any
   later authorized staging/activation. No server config, ranks, SQL, restart,
   reload, message or subscription was modified by this implementation.
