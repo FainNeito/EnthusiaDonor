@@ -1,5 +1,74 @@
 # Official donor display test.11 verification
 
+## PR #3 review repairs — 2026-10-15
+
+- Reproduced all three review findings on the PR branch before repair: two
+  assertion failures and one primary-group error (review-fixes-red.log).
+- Stable identity proof: offline Tebex customer IDs now require independently
+  verified UUID/customer bindings. Query all bound IDs for active packages and
+  include bindings in the confirmation fingerprint. Native UUID stores retain
+  automatic UUID matching. Current-name-only evidence is not sufficient.
+- Membership mutation: retain the validated node, recheck eligibility, then use
+  an exact mutation predicate that cannot delete a temporary/contextual replacement.
+- Primary fallback: establish a direct baseline default parent when needed and
+  set a valid fallback before deletion. Failed preparation retains Devotee;
+  already-correct stored primary values do not prevent saving.
+- Full Java 25 clean verify: 263 tests, zero failures/errors/skips. Includes the
+  three review reproductions plus additional identity alias/binding, actual
+  mutation replacement, rejected/denied fallback and already-correct primary regressions.
+  Velocity clean verify also passed; proxy source/version remain unchanged.
+- Real source-only probe with no verified bindings: all nine reviewed accounts
+  returned UNKNOWN and were held. This supersedes the earlier five-INACTIVE
+  classification: those name-only results are not enforcement authorization.
+  No live rank changes or configuration were performed.
+- Actual SMP LuckPerms API compatibility expanded to 20 interfaces / 157 method
+  descriptors, including the newly used inheritance builder; none are missing.
+- Revised LOCAL UNMERGED test.17 backend SHA-256:
+  d153838ec0f03aeaea8e2f50024e38c1a50665a4c4dbe807185d2e38f9cb69de.
+  Prior test.17 artifact hashes describe the pre-repair review build only.
+- Latest repair-head hosted CI must be inspected after push. Independent
+  mappings for this offline-ID store, isolated enforcement acceptance, review,
+  merge, merged-source build/staging and separately authorized activation remain
+  open. No restart, reload, production upload, SQL, notification or rank mutation.
+
+## Missed expiry reconciliation — test.17 (unmerged local review artifact)
+
+- Base: canonical main 3c50f93486464dc8b90dd04345ee0101cdcd1254, fetched
+  2026-10-15; isolated codex/devotee-reconciliation worktree.
+- Genuine new-test red: ReconciliationTest compilation failed before policy/store
+  types existed (reconciliation-red.log). Final Java 25 clean verify: 249 tests,
+  zero failures/errors/skips, including 44 new entitlement tests. Velocity clean
+  verify passed without proxy source/version changes.
+- Source adapter was exercised read-only against real Tebex/Mojang: five reviewed
+  paid accounts INACTIVE, two ACTIVE, two UNKNOWN. No LuckPerms mutation adapter
+  was loaded by that probe. ChrisD34 was excluded because manual cleanup was
+  already confirmed. These source classifications are not fresh rank writes or
+  subscription lifecycle status claims.
+- Actual live SMP LuckPerms-Bukkit-5.5.85.jar SHA-256
+  dc637ce18f48d3b75a7ffd1784b85be16a627359090dfe5adf15dab6d145dc7d.
+  All 141 compile API 5.4 method descriptors checked across 17 used interfaces
+  exist in the live JAR. Optional startup/stop with all LuckPerms classes denied
+  by an isolated classloader passes.
+- Local backend test artifact: target/EnthusiaDonors-1.1.0-test.17.jar,
+  SHA-256 0a362307894a95ba04039f52dcd2f6a66b401acccc9982551ddb69fe5276899a.
+  This is not a merged production artifact and has not been uploaded.
+- PR: https://github.com/FainNeito/EnthusiaDonor/pull/3, ready for review, not
+  merged. Implementation head b5be5dd049a0d71e4f303e1ecdefbda4af1e64bd passed
+  hosted Java 21 and 25 artifact jobs in run 38796877003 (backend and proxy).
+  Inspected all seven annotations: existing action Node runtime deprecation,
+  cold/duplicate caches and upcoming Ubuntu runner image notices. No source
+  failure findings. No submitted reviews or inline review comments. CodeRabbit
+  reported automatic review skipped for this OSS repository; this is not a
+  completed review or approval. This follow-up changes evidence documentation only.
+- Adapter remains disabled, defaults to audit, and must have one enforcement
+  owner. Its optional real permission writes are separate from sandbox actions;
+  earlier historical statements about this JAR excluding all LuckPerms writes
+  do not describe this new opt-in adapter.
+- Pending: review and latest-head hosted checks, isolated live enforcement including
+  offline/renewal/overlap/save-failure acceptance, merged-source release and any
+  later authorized staging/activation. No server config, ranks, SQL, restart,
+  reload, message or subscription was modified by this implementation.
+
 ## Reviewed preparation — test.16
 
 - Findings addressed: the publisher can register against externally provisioned

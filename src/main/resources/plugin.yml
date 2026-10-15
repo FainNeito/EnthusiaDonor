@@ -4,7 +4,7 @@ main: com.enthusia.donors.EnthusiaDonorsPlugin
 api-version: '1.21'
 author: Enthusia
 description: Official Tebex donor displays and opt-in payment announcements with isolated test controls. Does not grant donation entitlements.
-softdepend: [PlaceholderAPI]
+softdepend: [PlaceholderAPI, LuckPerms]
 libraries:
   - org.mariadb.jdbc:mariadb-java-client:3.4.1
   - org.xerial:sqlite-jdbc:3.49.1.0

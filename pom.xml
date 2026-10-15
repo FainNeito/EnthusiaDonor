@@ -2,7 +2,7 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
  <modelVersion>4.0.0</modelVersion>
- <groupId>com.enthusia</groupId><artifactId>EnthusiaDonors</artifactId><version>1.1.0-test.16</version><packaging>jar</packaging>
+ <groupId>com.enthusia</groupId><artifactId>EnthusiaDonors</artifactId><version>1.1.0-test.17</version><packaging>jar</packaging>
  <name>EnthusiaDonors Test</name><description>Official donor displays with isolated donation and broadcast testing.</description>
  <properties><maven.compiler.release>21</maven.compiler.release><project.build.sourceEncoding>UTF-8</project.build.sourceEncoding></properties>
  <repositories>
@@ -10,12 +10,14 @@
   <repository><id>placeholderapi</id><url>https://repo.extendedclip.com/content/repositories/placeholderapi/</url></repository>
  </repositories>
  <dependencies>
+  <dependency><groupId>net.luckperms</groupId><artifactId>api</artifactId><version>5.4</version><scope>provided</scope></dependency>
   <dependency><groupId>io.papermc.paper</groupId><artifactId>paper-api</artifactId><version>1.21-R0.1-SNAPSHOT</version><scope>provided</scope></dependency>
   <dependency><groupId>me.clip</groupId><artifactId>placeholderapi</artifactId><version>2.12.2</version><scope>provided</scope></dependency>
   <dependency><groupId>org.xerial</groupId><artifactId>sqlite-jdbc</artifactId><version>3.49.1.0</version><scope>provided</scope></dependency>
   <dependency><groupId>com.google.code.gson</groupId><artifactId>gson</artifactId><version>2.11.0</version><scope>provided</scope></dependency>
   <dependency><groupId>org.mariadb.jdbc</groupId><artifactId>mariadb-java-client</artifactId><version>3.4.1</version><scope>provided</scope></dependency>
   <dependency><groupId>org.junit.jupiter</groupId><artifactId>junit-jupiter</artifactId><version>5.11.4</version><scope>test</scope></dependency>
+  <dependency><groupId>org.mockito</groupId><artifactId>mockito-core</artifactId><version>5.23.0</version><scope>test</scope></dependency>
  </dependencies>
  <build>
   <finalName>${project.artifactId}-${project.version}</finalName>
