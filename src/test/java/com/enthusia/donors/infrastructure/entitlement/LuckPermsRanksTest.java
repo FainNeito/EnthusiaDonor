@@ -13,6 +13,8 @@ import org.bukkit.configuration.file.YamlConfiguration;
 import org.junit.jupiter.api.*;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Predicate;
+import net.luckperms.api.node.types.InheritanceNode;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
@@ -31,8 +33,9 @@ class LuckPermsRanksTest {
     LuckPermsRanks ranks;
 
     Node node(String group) {
-        Node node = mock(Node.class); when(node.getKey()).thenReturn("group." + group); when(node.getValue()).thenReturn(true);
+        Node node = mock(InheritanceNode.class); when(node.getKey()).thenReturn("group." + group); when(node.getValue()).thenReturn(true);
         var context = mock(ImmutableContextSet.class); when(context.isEmpty()).thenReturn(true); when(node.getContexts()).thenReturn(context);
+        when(node.equals(any(Node.class), eq(NodeEqualityPredicate.EXACT))).thenAnswer(call -> call.getArgument(0) == node);
         return node;
     }
     @BeforeEach void setup() {
@@ -48,13 +51,22 @@ class LuckPermsRanksTest {
         when(data.toCollection()).thenReturn(nodes); when(user.getInheritedGroups(any())).thenReturn(inherited);
         when(data.contains(any(), eq(NodeEqualityPredicate.EXACT))).thenReturn(Tristate.TRUE);
         when(data.remove(any())).thenAnswer(invocation -> { nodes.remove(invocation.getArgument(0)); return DataMutateResult.SUCCESS; });
+        doAnswer(invocation -> { nodes.removeIf(invocation.getArgument(0)); return null; })
+                .when(data).clear(org.mockito.ArgumentMatchers.<Predicate<? super Node>>any());
+        Node defaultParent = node("default");
+        var registry = mock(NodeBuilderRegistry.class); var builder = mock(InheritanceNode.Builder.class);
+        when(api.getNodeBuilderRegistry()).thenReturn(registry); when(registry.forInheritance()).thenReturn(builder);
+        when(builder.group("default")).thenReturn(builder); when(builder.build()).thenReturn((InheritanceNode) defaultParent);
+        when(data.add(any())).thenAnswer(invocation -> {
+            Node added = invocation.getArgument(0); nodes.add(added); return DataMutateResult.SUCCESS;
+        });
         nodes.add(devotee);
         ranks = new LuckPermsRanks(api, ReconciliationSettings.load(config), () -> stopped);
     }
     @Test void removesOnlyTheDirectDevoteeNodeAndSavesOfflineUser() throws Exception {
         Node avid = node("avid"); nodes.add(avid);
         assertTrue(ranks.remove(candidate)); assertEquals(List.of(avid), nodes);
-        verify(data).remove(devotee); verify(manager).saveUser(user);
+        verify(data).clear(org.mockito.ArgumentMatchers.<Predicate<? super Node>>any()); verify(manager).saveUser(user);
         verify(user, never()).setPrimaryGroup(any());
     }
     @Test void inheritedFounderMediaAndGloriousAreProtected() throws Exception {
@@ -94,5 +106,50 @@ class LuckPermsRanksTest {
         when(groups.getGroup("avid")).thenReturn(avid); when(user.getPrimaryGroup()).thenReturn("devotee");
         when(user.setPrimaryGroup("avid")).thenReturn(DataMutateResult.SUCCESS);
         assertTrue(ranks.remove(candidate)); verify(user).setPrimaryGroup("avid");
+    }
+    @Test void reviewConcurrentTemporaryReplacementMustNotBeRemoved() throws Exception {
+        Node replacement = node("devotee"); when(replacement.hasExpiry()).thenReturn(true);
+        // The permanent node is validated, then a renewal/admin replaces it before selection.
+        when(data.toCollection()).thenReturn(List.of(devotee), List.of(replacement));
+        assertFalse(ranks.remove(candidate), "A newly replaced temporary membership must be retained");
+        verify(data, never()).remove(replacement);
+    }
+    @Test void reviewSoleDevoteeParentMustStillBePersistentlyRemoved() throws Exception {
+        when(user.getPrimaryGroup()).thenReturn("devotee");
+        // Actual LuckPerms API rejects setPrimaryGroup(default) without a direct default node.
+        when(user.setPrimaryGroup("default")).thenAnswer(call -> nodes.stream().anyMatch(n -> n.getKey().equals("group.default"))
+                ? DataMutateResult.SUCCESS : DataMutateResult.FAIL);
+        assertTrue(ranks.remove(candidate), "A sole direct Devotee parent must be removable without an unsaved mutation");
+        verify(manager).saveUser(user);
+    }
+    @Test void replacementAtActualMutationMustSurvive() throws Exception {
+        Node replacement = node("devotee"); when(replacement.hasExpiry()).thenReturn(true);
+        doAnswer(invocation -> {
+            nodes.clear(); nodes.add(replacement);
+            nodes.removeIf(invocation.getArgument(0)); return null;
+        }).when(data).clear(org.mockito.ArgumentMatchers.<Predicate<? super Node>>any());
+        assertFalse(ranks.remove(candidate)); assertEquals(List.of(replacement), nodes);
+        verify(manager, never()).saveUser(any());
+    }
+    @Test void alreadyCorrectStoredFallbackDoesNotBlockSave() throws Exception {
+        nodes.add(node("avid")); var avid = mock(Group.class);
+        when(avid.getName()).thenReturn("avid"); when(avid.getWeight()).thenReturn(OptionalInt.of(10));
+        when(groups.getGroup("avid")).thenReturn(avid); when(user.getPrimaryGroup()).thenReturn("devotee");
+        when(user.setPrimaryGroup("avid")).thenReturn(DataMutateResult.FAIL_ALREADY_HAS);
+        assertTrue(ranks.remove(candidate)); verify(manager).saveUser(user);
+    }
+    @Test void rejectedFallbackMustRetainDevotee() throws Exception {
+        when(user.getPrimaryGroup()).thenReturn("devotee");
+        when(user.setPrimaryGroup("default")).thenReturn(DataMutateResult.FAIL);
+        assertThrows(Exception.class, () -> ranks.remove(candidate)); assertTrue(nodes.contains(devotee));
+        verify(data, never()).clear(org.mockito.ArgumentMatchers.<Predicate<? super Node>>any());
+        verify(manager, never()).saveUser(any());
+    }
+    @Test void deniedDefaultMustNotBeOverwrittenToPrepareFallback() throws Exception {
+        Node denied = node("default"); when(denied.getValue()).thenReturn(false); nodes.add(denied);
+        when(user.getPrimaryGroup()).thenReturn("devotee");
+        assertThrows(Exception.class, () -> ranks.remove(candidate));
+        assertTrue(nodes.contains(devotee)); verify(data, never()).add(any());
+        verify(data, never()).clear(org.mockito.ArgumentMatchers.<Predicate<? super Node>>any());
     }
 }

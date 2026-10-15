@@ -1,5 +1,36 @@
 # Official donor display test.11 verification
 
+## PR #3 review repairs — 2026-10-15
+
+- Reproduced all three review findings on the PR branch before repair: two
+  assertion failures and one primary-group error (review-fixes-red.log).
+- Stable identity proof: offline Tebex customer IDs now require independently
+  verified UUID/customer bindings. Query all bound IDs for active packages and
+  include bindings in the confirmation fingerprint. Native UUID stores retain
+  automatic UUID matching. Current-name-only evidence is not sufficient.
+- Membership mutation: retain the validated node, recheck eligibility, then use
+  an exact mutation predicate that cannot delete a temporary/contextual replacement.
+- Primary fallback: establish a direct baseline default parent when needed and
+  set a valid fallback before deletion. Failed preparation retains Devotee;
+  already-correct stored primary values do not prevent saving.
+- Full Java 25 clean verify: 263 tests, zero failures/errors/skips. Includes the
+  three review reproductions plus additional identity alias/binding, actual
+  mutation replacement, rejected/denied fallback and already-correct primary regressions.
+  Velocity clean verify also passed; proxy source/version remain unchanged.
+- Real source-only probe with no verified bindings: all nine reviewed accounts
+  returned UNKNOWN and were held. This supersedes the earlier five-INACTIVE
+  classification: those name-only results are not enforcement authorization.
+  No live rank changes or configuration were performed.
+- Actual SMP LuckPerms API compatibility expanded to 20 interfaces / 157 method
+  descriptors, including the newly used inheritance builder; none are missing.
+- Revised LOCAL UNMERGED test.17 backend SHA-256:
+  d153838ec0f03aeaea8e2f50024e38c1a50665a4c4dbe807185d2e38f9cb69de.
+  Prior test.17 artifact hashes describe the pre-repair review build only.
+- Latest repair-head hosted CI must be inspected after push. Independent
+  mappings for this offline-ID store, isolated enforcement acceptance, review,
+  merge, merged-source build/staging and separately authorized activation remain
+  open. No restart, reload, production upload, SQL, notification or rank mutation.
+
 ## Missed expiry reconciliation — test.17 (unmerged local review artifact)
 
 - Base: canonical main 3c50f93486464dc8b90dd04345ee0101cdcd1254, fetched

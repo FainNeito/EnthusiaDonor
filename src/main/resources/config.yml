@@ -21,6 +21,10 @@ entitlements:
   max-history-per-user: 100
   protected-groups: [founder, avid-founder, devotee-founder, media, glorious]
   protected-uuids: [] # Additional permanent/manual exceptions, using Minecraft UUIDs.
+  # Independently verified Minecraft UUID -> ALL known Tebex customer IDs.
+  # Required when store IDs differ from Mojang UUIDs (this store uses offline IDs).
+  # Never infer these bindings from current usernames alone. Unbound users are held.
+  verified-customers: {}
 
 # Real Tebex notifications, separate from testing.yml previews. Restart after changes.
 # Requires network.mode=publisher and a matching enabled relay for network chat.

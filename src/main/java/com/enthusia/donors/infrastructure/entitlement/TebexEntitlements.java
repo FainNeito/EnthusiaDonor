@@ -16,9 +16,18 @@ public final class TebexEntitlements {
     private final Set<Long> packages;
     private final long serverId;
     private final int maxHistory;
+    private final Map<UUID, Set<String>> verifiedCustomers;
 
     public TebexEntitlements(Transport transport, Set<Long> packages, long serverId, int maxHistory) {
+        this(transport, packages, serverId, maxHistory, Map.of());
+    }
+    public TebexEntitlements(Transport transport, Set<Long> packages, long serverId, int maxHistory,
+                             Map<UUID, Set<String>> verifiedCustomers) {
         this.transport = transport; this.packages = Set.copyOf(packages); this.serverId = serverId; this.maxHistory = maxHistory;
+        var bindings = new HashMap<UUID, Set<String>>();
+        verifiedCustomers.forEach((uuid, customers) -> bindings.put(uuid, customers.stream().map(TebexEntitlements::normalizeCustomer)
+                .collect(java.util.stream.Collectors.toUnmodifiableSet())));
+        this.verifiedCustomers = Map.copyOf(bindings);
         if (packages.isEmpty() || packages.stream().anyMatch(id -> id <= 0) || serverId <= 0 || maxHistory < 1)
             throw new IllegalArgumentException("Explicit server, subscription packages and bounded history required");
     }
@@ -68,10 +77,17 @@ public final class TebexEntitlements {
         var player = object(lookup.get("player"));
         String customer = text(player, "id");
         if (!customer.matches("[A-Za-z0-9-]{1,64}") || !text(player, "username").equalsIgnoreCase(candidate.name())) return unknown();
-        var active = array(transport.get("/player/" + customer + "/packages", true));
-        for (var item : active) {
-            long id = number(object(object(item).get("package")), "id");
-            if (packages.contains(id)) return new Evidence(State.ACTIVE, "");
+        String current = normalizeCustomer(customer);
+        Set<String> customers = verifiedCustomers.getOrDefault(candidate.uuid(), Set.of(normalizeCustomer(candidate.uuid().toString())));
+        // An offline/name-derived ID is not historical proof of Mojang UUID ownership.
+        if (!customers.contains(current)) return unknown();
+        for (String bound : customers.stream().sorted().toList()) {
+            String lookupId = bound.equals(current) ? customer : bound;
+            var active = array(transport.get("/player/" + lookupId + "/packages", true));
+            for (var item : active) {
+                long id = number(object(object(item).get("package")), "id");
+                if (packages.contains(id)) return new Evidence(State.ACTIVE, "");
+            }
         }
         var payments = array(lookup.get("payments"));
         if (payments.isEmpty() || payments.size() > maxHistory) return unknown();
@@ -100,12 +116,13 @@ public final class TebexEntitlements {
         }
         if (!paid) return unknown();
         Collections.sort(signature);
-        String proof = serverId + ":" + packages.stream().sorted().toList() + ":" + customer + ":" + candidate.uuid()
+        String proof = serverId + ":" + packages.stream().sorted().toList() + ":" + customers.stream().sorted().toList() + ":" + customer + ":" + candidate.uuid()
                 + ":" + candidate.name().toLowerCase(Locale.ROOT) + ":" + candidate.primaryGroup() + ":" + String.join("|", signature);
         String hash = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(proof.getBytes(StandardCharsets.UTF_8)));
         return new Evidence(State.INACTIVE, hash);
     }
     private static Evidence unknown() { return new Evidence(State.UNKNOWN, ""); }
+    static String normalizeCustomer(String value) { return value.replace("-", "").toLowerCase(Locale.ROOT); }
     private static JsonObject object(JsonElement element) {
         if (element == null || !element.isJsonObject()) throw new IllegalArgumentException("Expected official object");
         return element.getAsJsonObject();

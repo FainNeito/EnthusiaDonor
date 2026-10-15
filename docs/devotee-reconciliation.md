@@ -40,7 +40,13 @@ verifiable purchases; manual grants without that history remain untouched.
 
 The API's customer ID can differ from the Minecraft UUID. Resolve the Minecraft
 name against Mojang and LuckPerms independently, then use the ID returned by
-Tebex player lookup for package queries. Renamed, gifted or Bedrock identities
+Tebex player lookup for package queries only after a stable identity binding is
+established. Matching current usernames does not establish historical ownership.
+Native UUID stores may use the matching authenticated Minecraft UUID. Offline-ID
+stores must use explicit `entitlements.verified-customers` mappings, independently
+verified for the Minecraft UUID and all known prior-name Tebex customer IDs.
+All bound IDs are queried; an active purchase under any of them protects access.
+Renamed, gifted or Bedrock identities
 that cannot meet this proof remain held for review. No broad name-only removal.
 
 There is no atomic transaction spanning Tebex and LuckPerms. The last check
@@ -55,6 +61,24 @@ permission changes. An operator must reconcile that audit entry with the shared
 store. This is separate from an API outage, which never authorizes removal.
 
 ## SPEAR state
+
+### PR #3 review repair requirements
+
+- When a Tebex customer ID differs from the authenticated Minecraft UUID, the
+  adapter shall retain access unless an operator has independently verified the
+  UUID-to-customer binding. Current username ownership alone is insufficient.
+  Bindings shall include every known customer ID for renamed accounts; any active
+  configured package for any bound ID protects access. Never populate bindings
+  automatically from a name-only audit. Changed bindings reset confirmation.
+- The removal target shall be the exact permanent global positive node that was
+  validated, not a newly selected replacement. A new temporary/contextual node
+  shall remain untouched, and the mutation result shall reflect an absent target.
+- Primary-group fallback shall be established before removing Devotee. If default
+  is required, add only the standard direct default membership needed by the
+  LuckPerms API. Failed fallback shall not remove Devotee; an already-correct
+  stored fallback shall not prevent saving. Preserve Avid and unrelated nodes.
+- Reproduce the three review failures before edits and keep their regressions.
+  Production is unchanged; source repairs remain on the unmerged review PR.
 
 Spec written before implementation. Prove: focused tests will exercise expiry
 confirmation, active/overlapping packages, outages, identity/history failures,
@@ -80,6 +104,12 @@ entitlements:
 
 The adapter uses the existing private `tebex.api-key`; do not copy a secret into
 Git. Start with this on only the SMP backend after the release/activation gates.
+This store uses offline customer IDs: the prepared configuration does not itself
+authorize enforcement for those users. `verified-customers` defaults to `{}`;
+unbound offline IDs are held. Configure a verified Minecraft UUID as the map key
+and a list of all verified customer IDs as its value. Do not copy the old
+name-based audit into this map or treat that audit as proof. Independently
+verified mappings are still needed before this store's historical cleanup.
 Audit mode writes `entitlement-reconciliation/audit.jsonl`, with `HELD_ACTIVE`,
 `HELD_UNKNOWN`, `HELD_VERIFICATION_FAILED` and `WOULD_REMOVE` outcomes by Minecraft
 UUID. The scheduled summary includes held/waiting/proposed/removed counts. First
@@ -97,6 +127,15 @@ recorded user's direct group and prior primary group after checking current
 entitlements and intervening administrative changes. An `UNCERTAIN` record needs
 store/cache verification before any restoration. Never restore all donor groups
 from an old snapshot or resend purchase/broadcast commands.
+
+Mutation repair: a predicate removes only the validated positive permanent
+global node and leaves temporary/contextual replacements untouched. If primary
+Devotee needs a fallback, establish a remaining direct rank or the standard
+direct default membership first. A failed primary-group preparation retains
+Devotee. `FAIL_ALREADY_HAS` means the stored fallback is already correct. A
+concurrent change can cause the final removal predicate to retain the node;
+this is not claimed as a confirmed removal. There is still no cross-plugin
+transaction spanning primary metadata, concurrent grants and storage saves.
 
 Source must be reviewed/merged and built cleanly before any production staging.
 This implementation does not activate on currently running servers. First run

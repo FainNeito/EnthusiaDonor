@@ -6,6 +6,7 @@ import net.luckperms.api.*;
 import net.luckperms.api.model.user.User;
 import net.luckperms.api.node.*;
 import net.luckperms.api.node.matcher.NodeMatcher;
+import net.luckperms.api.model.data.DataMutateResult;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.function.BooleanSupplier;
@@ -36,37 +37,63 @@ public final class LuckPermsRanks implements Reconciliation.Ranks {
         return List.copyOf(candidates);
     }
     public boolean eligible(Candidate candidate) throws Exception {
-        return eligible(await(api.getUserManager().loadUser(candidate.uuid())), candidate);
+        return eligibleNode(await(api.getUserManager().loadUser(candidate.uuid())), candidate) != null;
     }
-    private boolean eligible(User user, Candidate candidate) {
+    private Node eligibleNode(User user, Candidate candidate) {
         if (stopped.getAsBoolean() || settings.protectedUsers().contains(candidate.uuid())
                 || !candidate.name().equalsIgnoreCase(user.getUsername())
-                || (!candidate.primaryGroup().isBlank() && !candidate.primaryGroup().equals(user.getPrimaryGroup()))) return false;
+                || (!candidate.primaryGroup().isBlank() && !candidate.primaryGroup().equals(user.getPrimaryGroup()))) return null;
         var direct = user.data().toCollection().stream().filter(n -> n.getKey().equals("group.devotee")).toList();
         // Do not mix direct permanent access with contextual, negative or temporary grants.
         if (direct.size() != 1 || !direct.getFirst().getValue() || direct.getFirst().hasExpiry()
-                || !direct.getFirst().getContexts().isEmpty()) return false;
+                || !direct.getFirst().getContexts().isEmpty()) return null;
         for (var group : user.getInheritedGroups(api.getQueryOptionsRegistry().defaultNonContextualOptions())) {
             String name = group.getName().toLowerCase(Locale.ROOT);
-            if (settings.protectedGroups().contains(name) || name.contains("founder")) return false;
+            if (settings.protectedGroups().contains(name) || name.contains("founder")) return null;
         }
-        return true;
+        return direct.getFirst();
     }
     public boolean remove(Candidate candidate) throws Exception {
         User user = await(api.getUserManager().loadUser(candidate.uuid()));
-        if (!eligible(user, candidate)) return false;
-        var node = user.data().toCollection().stream().filter(n -> n.getKey().equals("group.devotee")).findFirst().orElseThrow();
-        if (!user.data().contains(node, NodeEqualityPredicate.EXACT).asBoolean()) return false;
-        if (stopped.getAsBoolean() || !user.data().remove(node).wasSuccessful()) return false;
+        Node target = eligibleNode(user, candidate);
+        if (target == null) return false;
+        Node rechecked = eligibleNode(user, candidate);
+        if (rechecked == null || !rechecked.equals(target, NodeEqualityPredicate.EXACT)) return false;
+        String fallback = null;
         if (user.getPrimaryGroup().equals("devotee")) {
-            String fallback = user.data().toCollection().stream()
-                    .filter(n -> n.getKey().startsWith("group.") && n.getValue() && n.getContexts().isEmpty() && !n.hasExpiry())
+            fallback = user.data().toCollection().stream()
+                    .filter(n -> !n.getKey().equals("group.devotee") && n.getKey().startsWith("group.")
+                            && n.getValue() && n.getContexts().isEmpty() && !n.hasExpiry())
                     .map(n -> api.getGroupManager().getGroup(n.getKey().substring(6)))
                     .filter(Objects::nonNull)
                     .max(Comparator.comparingInt(g -> g.getWeight().orElse(0)))
                     .map(net.luckperms.api.model.group.Group::getName).orElse("default");
-            if (!user.setPrimaryGroup(fallback).wasSuccessful()) throw new IllegalStateException("Primary group update uncertain");
+            if (fallback.equals("default") && user.data().toCollection().stream()
+                    .noneMatch(n -> n.getKey().equals("group.default") && n.getValue() && n.getContexts().isEmpty() && !n.hasExpiry())) {
+                if (user.data().toCollection().stream().anyMatch(n -> n.getKey().equals("group.default")))
+                    throw new IllegalStateException("Nonstandard default membership; Devotee retained");
+                if (stopped.getAsBoolean()) return false;
+                Node defaultParent = api.getNodeBuilderRegistry().forInheritance().group("default").build();
+                DataMutateResult added = user.data().add(defaultParent);
+                if (!added.wasSuccessful() && added != DataMutateResult.FAIL_ALREADY_HAS)
+                    throw new IllegalStateException("Cannot establish default parent; Devotee retained");
+            }
+            if (stopped.getAsBoolean()) return false;
+            // The API requires direct membership; FAIL_ALREADY_HAS is an already-correct stored fallback.
+            DataMutateResult primary = user.setPrimaryGroup(fallback);
+            if (!primary.wasSuccessful() && primary != DataMutateResult.FAIL_ALREADY_HAS)
+                throw new IllegalStateException("Cannot establish primary group; Devotee retained");
         }
+        if (stopped.getAsBoolean()) return false;
+        var removed = new java.util.concurrent.atomic.AtomicBoolean();
+        // Predicate is evaluated on the actual mutation candidates. Never select a replacement node.
+        user.data().clear(node -> {
+            boolean matches = !stopped.getAsBoolean() && node.getValue() && !node.hasExpiry() && node.getContexts().isEmpty()
+                    && node.equals(target, NodeEqualityPredicate.EXACT);
+            if (matches) removed.set(true);
+            return matches;
+        });
+        if (!removed.get()) return false;
         await(api.getUserManager().saveUser(user));
         // Share the committed change with other LuckPerms backends/proxy.
         api.getMessagingService().ifPresent(service -> service.pushUserUpdate(user));

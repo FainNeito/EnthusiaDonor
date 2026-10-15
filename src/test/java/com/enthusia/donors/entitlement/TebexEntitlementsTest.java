@@ -11,7 +11,9 @@ class TebexEntitlementsTest {
     final Reconciliation.Candidate candidate = new Reconciliation.Candidate(uuid, "Donor");
     final Map<String, String> responses = new HashMap<>();
     final List<String> requested = new ArrayList<>();
+    final Map<UUID, Set<String>> bindings = new HashMap<>();
     TebexEntitlementsTest() {
+        bindings.put(uuid, Set.of("offlinecustomer"));
         responses.put("/information", "{\"server\":{\"id\":2147009}}");
         responses.put("/package/7053397", "{\"id\":7053397,\"type\":\"subscription\",\"disabled\":false}");
         responses.put("/users/profiles/minecraft/Donor", "{\"id\":\"bf15f0ff5c204476918aa525e28f4270\",\"name\":\"Donor\"}");
@@ -30,7 +32,7 @@ class TebexEntitlementsTest {
             requested.add(path);
             if (!responses.containsKey(path)) throw new java.io.IOException("unavailable");
             return JsonParser.parseString(responses.get(path));
-        }, Set.of(7053397L), 2147009, 100);
+        }, Set.of(7053397L), 2147009, 100, bindings);
     }
     @Test void verifiedPaidHistoryAndExplicitNoActivePackagesQualify() throws Exception {
         var c = client(); c.validate(); assertEquals(Reconciliation.State.INACTIVE, c.check(candidate).state());
@@ -101,5 +103,37 @@ class TebexEntitlementsTest {
     @Test void networkFailurePropagatesRatherThanAuthorizingRemoval() {
         responses.remove("/player/offlinecustomer/packages");
         assertThrows(Exception.class, () -> client().check(candidate));
+    }
+    @Test void reviewHistoricalOfflineCustomerMustNotAuthorizeDifferentMinecraftOwner() throws Exception {
+        // A new UUID now owns this name. The offline-mode Tebex account/history is unchanged.
+        UUID newOwner = UUID.fromString("cf15f0ff-5c20-4476-918a-a525e28f4270");
+        responses.put("/users/profiles/minecraft/Donor", responses.get("/users/profiles/minecraft/Donor").replace("bf15", "cf15"));
+        assertEquals(Reconciliation.State.UNKNOWN, client().check(new Reconciliation.Candidate(newOwner, "Donor")).state(),
+                "Current name ownership does not establish ownership of a historical offline Tebex customer");
+    }
+    @Test void unboundOfflineCustomerIsHeldWithoutHistoryOrPackageQueries() throws Exception {
+        bindings.clear(); assertEquals(Reconciliation.State.UNKNOWN, client().check(candidate).state());
+        assertFalse(requested.contains("/player/offlinecustomer/packages"));
+    }
+    @Test void activePurchaseUnderBoundFormerNameProtectsAccess() throws Exception {
+        bindings.put(uuid, Set.of("offlinecustomer", "formercustomer"));
+        responses.put("/player/formercustomer/packages", "[{\"package\":{\"id\":7053397}}]");
+        assertEquals(Reconciliation.State.ACTIVE, client().check(candidate).state());
+    }
+    @Test void unavailableBoundFormerCustomerPreservesAccess() {
+        bindings.put(uuid, Set.of("offlinecustomer", "formercustomer"));
+        assertThrows(Exception.class, () -> client().check(candidate));
+    }
+    @Test void bindingChangeRestartsFingerprint() throws Exception {
+        String before = client().check(candidate).fingerprint();
+        bindings.put(uuid, Set.of("offlinecustomer", "formercustomer")); responses.put("/player/formercustomer/packages", "[]");
+        assertNotEquals(before, client().check(candidate).fingerprint());
+    }
+    @Test void nativeUuidStoreCanBeVerifiedWithoutManualBinding() throws Exception {
+        bindings.clear(); String nativeId = uuid.toString().replace("-", "");
+        responses.put("/user/Donor", responses.get("/user/Donor").replace("offlinecustomer", nativeId));
+        responses.put("/payments/tbx-paid", responses.get("/payments/tbx-paid").replace("offlinecustomer", nativeId));
+        responses.put("/player/" + nativeId + "/packages", "[]");
+        assertEquals(Reconciliation.State.INACTIVE, client().check(candidate).state());
     }
 }

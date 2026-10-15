@@ -32,7 +32,7 @@ public final class ReconciliationLifecycle implements AutoCloseable {
         lock = channel.tryLock();
         if (lock == null) throw new IllegalStateException("Another local entitlement reconciliation owner exists");
         files = new ReconciliationFiles(directory, settings.enforce());
-        source = new TebexEntitlements(TebexEntitlements.http(settings.key(), settings.timeout()), settings.packages(), settings.serverId(), settings.maxHistory());
+        source = new TebexEntitlements(TebexEntitlements.http(settings.key(), settings.timeout()), settings.packages(), settings.serverId(), settings.maxHistory(), settings.verifiedCustomers());
         engine = new Reconciliation(new LuckPermsRanks(settings, () -> closed), source::check, files,
                 settings.enforce(), settings.confirmation(), settings.interval().multipliedBy(3));
         task = plugin.getServer().getScheduler().runTaskTimerAsynchronously(plugin, this::poll, 20L, settings.interval().toSeconds() * 20L);

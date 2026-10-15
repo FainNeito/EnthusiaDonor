@@ -2,6 +2,15 @@
 
 ## Missed Devotee expiry reconciliation — 2026-10-15
 
+- [x] Reproduce PR #3's identity, replacement-node and missing-default failures;
+  repair them with permanent regressions. Prior name-only INACTIVE classifications
+  are superseded by the stable binding requirement.
+- [x] Repair verification: 263 local tests pass; 157 used API descriptors across
+  20 interfaces match the live SMP LuckPerms JAR. Read-only unbound source probe
+  holds all reviewed offline-ID accounts. Latest CI is reported on PR #3.
+- [ ] Independently verify this offline-ID store's Minecraft UUID/customer mappings
+  before enabling historical cleanup; unbound identities remain held.
+
 - [x] Fetch canonical main and isolate `codex/devotee-reconciliation` from 3c50f934.
 - [x] Specify official non-expired-package authority, paid-history and identity
   proof, repeated checks, higher-rank protection and failure boundaries in
