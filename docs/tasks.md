@@ -136,3 +136,19 @@ Requirements:
 - Do not flatten the gradients to a single color.
 - Do not include the testing marker as part of the rank text.
 - Keep the rank strings configurable in the bulk-update config rather than hard-coding them.
+
+
+## Donor head emojis - source queue (test.18)
+
+- [x] Spec: head-emojis.md; fresh canonical main in an isolated branch.
+- [x] Prove: new queue tests failed compilation before implementation. Reproduced
+  optional LuckPerms class-link failure; fixed with a separate linking adapter.
+- [x] Engine: counted official snapshots, exact identity/bindings, bounded profile
+  reads, source PNG/YAML staging, stable glyphs and contextual owner permissions.
+- [x] Architecture: no pack publishing/dispatch port; no rank or sandbox writes.
+- [x] Refine: 225 backend tests pass; companion Velocity clean verify passes;
+  123 compile API descriptors exist in actual TEST LuckPerms 5.5.87.
+- [ ] GitHub exact-head CI and independent review; merge and clean merged build.
+- [ ] Verified bindings for mismatched Tebex/Minecraft UUIDs; no name-only grants.
+- [ ] Authorized TEST plugin startup, new paid-donor fixture, planned pack release
+  and player rendering acceptance. Running plugin has not been replaced.

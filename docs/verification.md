@@ -130,3 +130,30 @@ Live Paper, PlaceholderAPI, hologram, and Tebex comparisons remain pending. This
 - Staged on Velocity 25319956: plugins/chapter 2 staging/EnthusiaDonors-VelocityRelay-1.1.0-test.15.jar and EnthusiaDonors-test15-activation.md. A proxy staging folder was created; existing active JAR/configuration were not replaced.
 - Screenshots: ../artifacts/donor-test15-staging/backend.jpg and proxy.jpg. These prove remote file presence, not active plugin loading or client/Discord delivery. No restart, reload, test/real notification, commit, push, PR or production database provisioning occurred.
 - Remaining acceptance: shared MariaDB schema/credentials and matching source/signing configuration, later approved plugin activation, baseline sync, subsequent actual payment shown across two backends and smp-chatter, live outage/shutdown recovery. Current official polling interval is 10 minutes; it can be reduced to 1 minute. Official Glorious finalization/permission grants are still separate work.
+
+## Donor head queue - test.18
+
+- Canonical main fetched at 3c50f93486464dc8b90dd04345ee0101cdcd1254;
+  isolated codex/donor-head-emojis branch, independent of unmerged PR #3.
+- Initial queue tests failed compilation before policy types existed. Later a
+  classloader test reproduced absent-LuckPerms startup failure; it passes after
+  separating the optional permission adapter. No historical red/green claim.
+- Final Java 25 clean verify: 225 tests, zero failures/errors/skips; 20 new tests
+  cover official/fake gating, UUID proof, permission retry, restart adoption,
+  glyph/alias collisions, unchanged generated pack, corrupt files, failed skins,
+  shutdown, concurrent operator edit, legacy hat composition and dimension limits.
+- Velocity clean verify passed with unchanged proxy source/version (test.16).
+- Actual TEST LuckPerms 5.5.87 SHA256:
+  09d07b68965717976d2bab2f8d10436676f7c68d90bf6d24628cc0e5228bf406.
+  All 123 compile API descriptors across 14 relevant interfaces are available.
+- Local UNMERGED test.18 backend SHA256:
+  dcba76384892967285faa0a9ebc26c25ca986b62d3a7451e604abce727ee62f6.
+- Separate authorized TEST operation: 147 existing pack owners each granted only
+  their own enthusia.donorhead.UUID node in server=test, all console-confirmed.
+  These are cosmetic grants to the prior icon roster, not proof of paid ranks.
+- No project-local EARS/state helper exists. Spec/tasks/tests provide the scoped
+  SPEAR evidence; no automatic validator pass is claimed.
+- Feature remains disabled by default and not activated on TEST or production.
+  Names cannot bind this store's offline UUIDs automatically; verified player
+  bindings and later approved startup are required. No restart or pack reload
+  occurred during permission grants or feature work. Player acceptance pending.

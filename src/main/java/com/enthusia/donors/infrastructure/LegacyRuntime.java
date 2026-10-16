@@ -17,10 +17,12 @@ public final class LegacyRuntime implements AutoCloseable {
     private LeaderboardService leaderboardService;
     private PlayerStatService playerStatService;
     private PlaceholderHook placeholderHook;
+    private DonorCache donorCache;
+    public DonorCache donorCache(){return donorCache;}
     public LegacyRuntime(JavaPlugin plugin) {this.plugin=plugin;}
     public void start() {
         configManager=new ConfigManager(plugin);configManager.load();
-        var cache=new DonorCache();var playerStatCache=new PlayerStatCache();
+        var cache=new DonorCache();donorCache=cache;var playerStatCache=new PlayerStatCache();
         leaderboardService=new LeaderboardService(plugin,configManager,
                 new DonorRepository(plugin.getDataFolder().toPath(),plugin.getLogger()),
                 new TebexClient(plugin.getLogger()),cache,
