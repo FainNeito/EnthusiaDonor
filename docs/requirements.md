@@ -50,3 +50,10 @@ The test.6 JAR shows raw `%enthusiadonors_*%` tokens on donor and kill/death hol
 The shared data contract is in [network-data.md](network-data.md). The signed Velocity announcement/outbox contract and delivery uncertainty policy are in [proxy-relay.md](proxy-relay.md). Both are opt-in test features; real Tebex event ingestion and payment-transaction announcements remain separate ledger work.
 
 Unit tests prove value mapping, source separation, and empty/privacy behavior. A clean Maven build and JAR inspection prove compilation and packaging. A live Paper server with a configured Tebex key, PlaceholderAPI, and the hologram plugin is still needed to prove the official totals and player-visible replacement.
+
+## Donor head source queue
+
+See [head-emojis.md](head-emojis.md). New assets shall never trigger an automatic
+resource-pack reload or download. Owner permissions shall be restricted to the
+configured local LuckPerms server context, and inherited ranks shall not establish
+purchase eligibility. Unverified identity mismatches shall remain pending.

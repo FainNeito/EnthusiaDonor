@@ -102,3 +102,14 @@ privacy:
 testing:
   fake-data-enabled: false
   fake-player-count: 12
+
+# Generate source assets only. NEVER reloads/generates/uploads/sends the pack.
+# Enable on ONE backend. Announce a maintenance window before manual Nexo publication.
+head-emojis:
+  enabled: false
+  permission-server: test # Must match this backend's LuckPerms server context.
+  batch-size: 5
+  timeout-seconds: 3
+  # Exact independently verified Tebex payment UUID -> current Minecraft UUID.
+  # Mismatches without a mapping remain pending; names alone never grant permission.
+  verified-players: {}
