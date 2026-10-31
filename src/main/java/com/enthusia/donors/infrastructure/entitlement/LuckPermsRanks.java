@@ -26,13 +26,26 @@ public final class LuckPermsRanks implements Reconciliation.Ranks {
     public List<Candidate> candidates() throws Exception {
         await(api.getGroupManager().loadAllGroups());
         var nodes = await(api.getUserManager().searchAll(NodeMatcher.key("group.devotee")));
-        if (nodes.size() > settings.maxUsers()) throw new IllegalStateException("Reconciliation user bound exceeded; no ranks changed");
+        var uuids = new TreeSet<>(nodes.keySet());
+        if (settings.reconcileFounderVariant())
+            uuids.addAll(await(api.getUserManager().searchAll(NodeMatcher.key("group.devotee-founder"))).keySet());
+        if (uuids.size() > settings.maxUsers()) throw new IllegalStateException("Reconciliation user bound exceeded; no ranks changed");
         var candidates = new ArrayList<Candidate>();
-        for (UUID uuid : nodes.keySet().stream().sorted().toList()) {
+        for (UUID uuid : uuids) {
             if (stopped.getAsBoolean()) break;
             User user = await(api.getUserManager().loadUser(uuid));
             String name = user.getUsername();
-            if (name != null && !name.isBlank()) candidates.add(new Candidate(uuid, name, user.getPrimaryGroup()));
+            if (name == null || name.isBlank()) continue;
+            var variants = settings.reconcileFounderVariant() ? List.of("devotee", "devotee-founder") : List.of("devotee");
+            Candidate fallback = null, selected = null;
+            for (String variant : variants) {
+                String key = "group." + variant;
+                if (user.data().toCollection().stream().noneMatch(n -> n.getKey().equals(key))) continue;
+                var candidate = new Candidate(uuid, name, user.getPrimaryGroup(), variant);
+                if (fallback == null) fallback = candidate;
+                if (eligibleNode(user, candidate) != null) { selected = candidate; break; }
+            }
+            if (selected != null || fallback != null) candidates.add(selected == null ? fallback : selected);
         }
         return List.copyOf(candidates);
     }
@@ -41,15 +54,18 @@ public final class LuckPermsRanks implements Reconciliation.Ranks {
     }
     private Node eligibleNode(User user, Candidate candidate) {
         if (stopped.getAsBoolean() || settings.protectedUsers().contains(candidate.uuid())
+                || (candidate.targetGroup().equals("devotee-founder") && !settings.reconcileFounderVariant())
                 || !candidate.name().equalsIgnoreCase(user.getUsername())
                 || (!candidate.primaryGroup().isBlank() && !candidate.primaryGroup().equals(user.getPrimaryGroup()))) return null;
-        var direct = user.data().toCollection().stream().filter(n -> n.getKey().equals("group.devotee")).toList();
+        var direct = user.data().toCollection().stream().filter(n -> n.getKey().equals("group." + candidate.targetGroup())).toList();
         // Do not mix direct permanent access with contextual, negative or temporary grants.
         if (direct.size() != 1 || !direct.getFirst().getValue() || direct.getFirst().hasExpiry()
                 || !direct.getFirst().getContexts().isEmpty()) return null;
         for (var group : user.getInheritedGroups(api.getQueryOptionsRegistry().defaultNonContextualOptions())) {
             String name = group.getName().toLowerCase(Locale.ROOT);
-            if (settings.protectedGroups().contains(name) || name.contains("founder")) return null;
+            if (settings.explicitlyProtectedGroups().contains(name)) return null;
+            if (!settings.allowDirectRemovalFromProtectedGroups()
+                    && (settings.protectedGroups().contains(name) || name.contains("founder"))) return null;
         }
         return direct.getFirst();
     }
@@ -60,9 +76,9 @@ public final class LuckPermsRanks implements Reconciliation.Ranks {
         Node rechecked = eligibleNode(user, candidate);
         if (rechecked == null || !rechecked.equals(target, NodeEqualityPredicate.EXACT)) return false;
         String fallback = null;
-        if (user.getPrimaryGroup().equals("devotee")) {
+        if (user.getPrimaryGroup().equals(candidate.targetGroup())) {
             fallback = user.data().toCollection().stream()
-                    .filter(n -> !n.getKey().equals("group.devotee") && n.getKey().startsWith("group.")
+                    .filter(n -> !n.getKey().equals("group." + candidate.targetGroup()) && n.getKey().startsWith("group.")
                             && n.getValue() && n.getContexts().isEmpty() && !n.hasExpiry())
                     .map(n -> api.getGroupManager().getGroup(n.getKey().substring(6)))
                     .filter(Objects::nonNull)

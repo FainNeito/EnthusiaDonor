@@ -6,8 +6,14 @@ import java.util.*;
 /** Official entitlement policy. No Paper, HTTP, database or LuckPerms dependencies. */
 public final class Reconciliation {
     public enum State { ACTIVE, INACTIVE, UNKNOWN }
-    public record Candidate(UUID uuid, String name, String primaryGroup) {
-        public Candidate(UUID uuid, String name) { this(uuid, name, ""); }
+    public record Candidate(UUID uuid, String name, String primaryGroup, String targetGroup) {
+        public Candidate {
+            Objects.requireNonNull(uuid); Objects.requireNonNull(name); Objects.requireNonNull(primaryGroup);
+            if (!Set.of("devotee", "devotee-founder").contains(targetGroup))
+                throw new IllegalArgumentException("Unsupported subscription target");
+        }
+        public Candidate(UUID uuid, String name) { this(uuid, name, "", "devotee"); }
+        public Candidate(UUID uuid, String name, String primaryGroup) { this(uuid, name, primaryGroup, "devotee"); }
     }
     public record Evidence(State state, String fingerprint) { }
     public record Pending(String fingerprint, Instant first, Instant last, int checks) { }
@@ -61,12 +67,14 @@ public final class Reconciliation {
                 pending.remove(candidate.uuid()); held++;
                 store.audit(candidate, now, "HELD_" + evidence.state()); continue;
             }
+            // Never carry an earlier group's confirmation to a different direct membership.
+            String scopedFingerprint = evidence.fingerprint() + "|target=" + candidate.targetGroup();
             Pending before = pending.get(candidate.uuid());
-            boolean fresh = before != null && before.fingerprint().equals(evidence.fingerprint())
+            boolean fresh = before != null && before.fingerprint().equals(scopedFingerprint)
                     && now.isAfter(before.last()) && !now.isBefore(before.first())
                     && Duration.between(before.last(), now).compareTo(maxGap) <= 0;
             Pending observation = fresh ? new Pending(before.fingerprint(), before.first(), now, Math.min(2, before.checks() + 1))
-                    : new Pending(evidence.fingerprint(), now, now, 1);
+                    : new Pending(scopedFingerprint, now, now, 1);
             pending.put(candidate.uuid(), observation);
             if (observation.checks() < 2 || Duration.between(observation.first(), now).compareTo(confirmation) < 0) {
                 waiting++; continue;

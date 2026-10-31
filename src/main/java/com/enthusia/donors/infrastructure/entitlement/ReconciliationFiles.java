@@ -48,6 +48,7 @@ public final class ReconciliationFiles implements Reconciliation.Store {
         var entry = new JsonObject(); entry.addProperty("at", now.toString()); entry.addProperty("uuid", candidate.uuid().toString());
         entry.addProperty("outcome", outcome); entry.addProperty("enforce", enforce);
         entry.addProperty("previous_primary_group", candidate.primaryGroup());
+        entry.addProperty("target_group", candidate.targetGroup());
         writeForced(directory.resolve("audit.jsonl"), entry + "\n", true);
     }
     private static void writeForced(Path path, String content, boolean append) throws Exception {

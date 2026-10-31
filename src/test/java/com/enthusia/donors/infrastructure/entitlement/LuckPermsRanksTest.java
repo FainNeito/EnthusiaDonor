@@ -7,6 +7,7 @@ import net.luckperms.api.model.data.*;
 import net.luckperms.api.model.group.*;
 import net.luckperms.api.model.user.*;
 import net.luckperms.api.node.*;
+import net.luckperms.api.node.matcher.NodeMatcher;
 import net.luckperms.api.query.QueryOptionsRegistry;
 import net.luckperms.api.util.Tristate;
 import org.bukkit.configuration.file.YamlConfiguration;
@@ -151,5 +152,112 @@ class LuckPermsRanksTest {
         assertThrows(Exception.class, () -> ranks.remove(candidate));
         assertTrue(nodes.contains(devotee)); verify(data, never()).add(any());
         verify(data, never()).clear(org.mockito.ArgumentMatchers.<Predicate<? super Node>>any());
+    }
+
+    private LuckPermsRanks founderEnabled() {
+        var config = new YamlConfiguration(); config.set("entitlements.enabled", true);
+        config.set("entitlements.delivery-server-id", 2147009); config.set("entitlements.devotee-package-ids", List.of(7053397));
+        config.set("entitlements.reconcile-founder-variant", true);
+        config.set("entitlements.allow-direct-removal-from-protected-groups", true);
+        config.set("tebex.api-key", "private-test-key");
+        return new LuckPermsRanks(api, ReconciliationSettings.load(config), () -> stopped);
+    }
+    @Test void founderVariantRemovalKeepsFounderAndAvidMemberships() throws Exception {
+        nodes.clear(); Node founderDevotee=node("devotee-founder"), avidFounder=node("avid-founder"), founder=node("founder");
+        nodes.addAll(List.of(founderDevotee,avidFounder,founder));
+        var inheritedFounder=mock(Group.class);when(inheritedFounder.getName()).thenReturn("founder");inherited.add(inheritedFounder);
+        var target=new Candidate(uuid,"Donor","default","devotee-founder");
+        var adapter=founderEnabled();assertTrue(adapter.eligible(target));assertTrue(adapter.remove(target));
+        assertEquals(List.of(avidFounder,founder),nodes);verify(manager).saveUser(user);
+    }
+    @Test void discoversOfflineFounderOnlyCandidateWhenExplicitlyEnabled() throws Exception {
+        nodes.clear();Node founderDevotee=node("devotee-founder");nodes.add(founderDevotee);
+        when(groups.loadAllGroups()).thenReturn(CompletableFuture.completedFuture(null));
+        Map<UUID,Collection<Node>> found=Map.of(uuid,List.of(founderDevotee));
+        when(manager.<Node>searchAll(any())).thenReturn(CompletableFuture.completedFuture(Map.of()),CompletableFuture.completedFuture(found));
+        try (var matchers = mockStatic(NodeMatcher.class)) {
+            matchers.when(() -> NodeMatcher.key(anyString())).thenReturn(mock(NodeMatcher.class));
+            assertEquals(List.of(new Candidate(uuid,"Donor","default","devotee-founder")),founderEnabled().candidates());
+        }
+    }
+    @Test void discoversEligibleFounderVariantWhenOtherVariantIsTemporary() throws Exception {
+        when(devotee.hasExpiry()).thenReturn(true);
+        Node founderDevotee = node("devotee-founder"); nodes.add(founderDevotee);
+        when(groups.loadAllGroups()).thenReturn(CompletableFuture.completedFuture(null));
+        Map<UUID, Collection<Node>> first = Map.of(uuid, List.of(devotee));
+        Map<UUID, Collection<Node>> second = Map.of(uuid, List.of(founderDevotee));
+        when(manager.<Node>searchAll(any())).thenReturn(CompletableFuture.completedFuture(first), CompletableFuture.completedFuture(second));
+        try (var matchers = mockStatic(NodeMatcher.class)) {
+            matchers.when(() -> NodeMatcher.key(anyString())).thenReturn(mock(NodeMatcher.class));
+            assertEquals(List.of(new Candidate(uuid, "Donor", "default", "devotee-founder")), founderEnabled().candidates());
+        }
+    }
+    @Test void combinedVariantDiscoveryAppliesUserLimitBeforeLoadingUsers() throws Exception {
+        var config = new YamlConfiguration(); config.set("entitlements.enabled", true);
+        config.set("entitlements.delivery-server-id", 2147009); config.set("entitlements.devotee-package-ids", List.of(7053397));
+        config.set("entitlements.reconcile-founder-variant", true); config.set("entitlements.max-users", 1);
+        config.set("tebex.api-key", "private-test-key");
+        when(groups.loadAllGroups()).thenReturn(CompletableFuture.completedFuture(null));
+        Map<UUID, Collection<Node>> first = Map.of(uuid, List.of(devotee));
+        Map<UUID, Collection<Node>> second = Map.of(UUID.randomUUID(), List.of(node("devotee-founder")));
+        when(manager.<Node>searchAll(any())).thenReturn(CompletableFuture.completedFuture(first), CompletableFuture.completedFuture(second));
+        var adapter = new LuckPermsRanks(api, ReconciliationSettings.load(config), () -> stopped);
+        try (var matchers = mockStatic(NodeMatcher.class)) {
+            matchers.when(() -> NodeMatcher.key(anyString())).thenReturn(mock(NodeMatcher.class));
+            var error = assertThrows(IllegalStateException.class, adapter::candidates);
+            assertTrue(error.getMessage().contains("user bound exceeded"));
+        }
+        verify(manager, never()).loadUser(any(UUID.class));
+    }
+    @Test void directExpiredSubscriptionCanBeRemovedWithoutRemovingMediaOrGlorious() throws Exception {
+        Node media=node("media"),glorious=node("glorious-founders");nodes.add(media);nodes.add(glorious);
+        var inheritedMedia=mock(Group.class);when(inheritedMedia.getName()).thenReturn("media");inherited.add(inheritedMedia);
+        assertTrue(founderEnabled().remove(candidate));assertEquals(List.of(media,glorious),nodes);
+    }
+    @Test void founderVariantIsHeldByDefault() throws Exception {
+        nodes.clear();nodes.add(node("devotee-founder"));
+        assertFalse(ranks.eligible(new Candidate(uuid,"Donor","default","devotee-founder")));
+        verify(manager,never()).saveUser(any());
+    }
+    @Test void explicitlyProtectedGroupStillHoldsWithBroaderCleanupEnabled() throws Exception {
+        nodes.clear();nodes.add(node("devotee-founder"));
+        var media=mock(Group.class);when(media.getName()).thenReturn("media");inherited.add(media);
+        var config=new YamlConfiguration();config.set("entitlements.enabled",true);config.set("tebex.api-key","private-test-key");
+        config.set("entitlements.delivery-server-id",2147009);config.set("entitlements.devotee-package-ids",List.of(7053397));
+        config.set("entitlements.reconcile-founder-variant",true);config.set("entitlements.allow-direct-removal-from-protected-groups",true);
+        config.set("entitlements.protected-groups",List.of("media"));
+        var adapter=new LuckPermsRanks(api,ReconciliationSettings.load(config),()->stopped);
+        assertFalse(adapter.eligible(new Candidate(uuid,"Donor","default","devotee-founder")));
+        assertFalse(adapter.remove(new Candidate(uuid,"Donor","default","devotee-founder")));verify(manager,never()).saveUser(any());
+    }
+    @Test void explicitlyProtectedGroupStillHoldsEvenWithBroaderCleanupEnabled() throws Exception {
+        var config=new YamlConfiguration();config.set("entitlements.enabled",true);config.set("tebex.api-key","private-test-key");
+        config.set("entitlements.delivery-server-id",2147009);config.set("entitlements.devotee-package-ids",List.of(7053397));
+        config.set("entitlements.reconcile-founder-variant",true);config.set("entitlements.allow-direct-removal-from-protected-groups",true);
+        config.set("entitlements.protected-groups",List.of("media"));
+        var media=mock(Group.class);when(media.getName()).thenReturn("media");inherited.add(media);
+        var adapter=new LuckPermsRanks(api,ReconciliationSettings.load(config),()->stopped);
+        assertFalse(adapter.remove(candidate));assertEquals(List.of(devotee),nodes);verify(manager,never()).saveUser(any());
+    }
+    @Test void targetedFounderVariantLeavesOtherDirectSubscriptionUntouched() throws Exception {
+        Node founderDevotee=node("devotee-founder");nodes.add(founderDevotee);
+        assertTrue(founderEnabled().remove(new Candidate(uuid,"Donor","default","devotee-founder")));
+        assertEquals(List.of(devotee),nodes);
+    }
+    @Test void founderTemporaryOrContextualReplacementSurvivesMutation() throws Exception {
+        nodes.clear();Node original=node("devotee-founder"),replacement=node("devotee-founder");nodes.add(original);
+        when(replacement.hasExpiry()).thenReturn(true);
+        doAnswer(call->{nodes.clear();nodes.add(replacement);nodes.removeIf(call.getArgument(0));return null;})
+                .when(data).clear(org.mockito.ArgumentMatchers.<Predicate<? super Node>>any());
+        assertFalse(founderEnabled().remove(new Candidate(uuid,"Donor","default","devotee-founder")));
+        assertEquals(List.of(replacement),nodes);verify(manager,never()).saveUser(any());
+    }
+    @Test void founderPrimaryFallsBackToRemainingFounderRank() throws Exception {
+        nodes.clear();nodes.add(node("devotee-founder"));nodes.add(node("avid-founder"));
+        var avidFounder=mock(Group.class);when(avidFounder.getName()).thenReturn("avid-founder");when(avidFounder.getWeight()).thenReturn(OptionalInt.of(16));
+        when(groups.getGroup("avid-founder")).thenReturn(avidFounder);when(user.getPrimaryGroup()).thenReturn("devotee-founder");
+        when(user.setPrimaryGroup("avid-founder")).thenReturn(DataMutateResult.SUCCESS);
+        assertTrue(founderEnabled().remove(new Candidate(uuid,"Donor","devotee-founder","devotee-founder")));
+        verify(user).setPrimaryGroup("avid-founder");
     }
 }
