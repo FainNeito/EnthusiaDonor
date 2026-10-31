@@ -19,7 +19,15 @@ class ReconciliationSettingsTest {
         var s = ReconciliationSettings.load(config()); assertFalse(s.enforce());
         assertEquals(15, s.interval().toMinutes()); assertEquals(60, s.confirmation().toMinutes());
         assertTrue(s.protectedGroups().containsAll(List.of("founder", "media", "glorious")));
+        assertFalse(s.reconcileFounderVariant());
+        assertFalse(s.allowDirectRemovalFromProtectedGroups());
         assertFalse(s.toString().contains("private-test-key"));
+    }
+    @Test void broaderDirectCleanupRequiresTwoExplicitOptions() {
+        var y=config();y.set("entitlements.reconcile-founder-variant",true);
+        var s=ReconciliationSettings.load(y);assertTrue(s.reconcileFounderVariant());assertFalse(s.allowDirectRemovalFromProtectedGroups());
+        y.set("entitlements.allow-direct-removal-from-protected-groups",true);
+        assertTrue(ReconciliationSettings.load(y).allowDirectRemovalFromProtectedGroups());
     }
     @Test void invalidOrMissingAuthorityRejected() {
         var y = config(); y.set("tebex.api-key", ""); assertThrows(Exception.class, () -> ReconciliationSettings.load(y));

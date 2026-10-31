@@ -87,10 +87,46 @@ class ReconciliationTest {
     @Test void sameTimestampIsNotASeparateCheck() throws Exception {
         var e = engine(true); e.run(start); e.run(start); assertEquals(0, ranks.removed);
     }
+    @Test void oldUnscopedPendingEvidenceCannotAuthorizeRemovalAfterUpgrade() throws Exception {
+        java.nio.file.Files.writeString(dir.resolve("pending.json"), "{\"version\":1,\"enforce\":true,\"pending\":{\"" + player.uuid()
+                + "\":{\"fingerprint\":\"customer:payment\",\"first\":\"" + start + "\",\"last\":\"" + start.plusSeconds(1800) + "\",\"checks\":2}}}");
+        engine(true).run(start.plusSeconds(3600));assertEquals(0,ranks.removed);
+    }
     @Test void failedSaveIsJournalledAsUncertain() throws Exception {
         var e = engine(true); e.run(start); ranks.failSave = true; e.run(start.plusSeconds(3600));
         String audit = java.nio.file.Files.readString(dir.resolve("audit.jsonl"));
         assertTrue(audit.contains("INTENT")); assertTrue(audit.contains("UNCERTAIN"));
         assertEquals(0, ranks.removed);
+    }
+    @Test void changingTargetGroupStartsFreshConfirmation() throws Exception {
+        var current=new java.util.concurrent.atomic.AtomicReference<>(new Reconciliation.Candidate(player.uuid(),"Donor","default","devotee"));
+        int[] removed={0};
+        var targetRanks=new Reconciliation.Ranks(){
+            public List<Reconciliation.Candidate> candidates(){return List.of(current.get());}
+            public boolean eligible(Reconciliation.Candidate c){return true;}
+            public boolean remove(Reconciliation.Candidate c){removed[0]++;return true;}
+        };
+        var e=new Reconciliation(targetRanks,c->new Reconciliation.Evidence(Reconciliation.State.INACTIVE,"same-payment"),
+                new ReconciliationFiles(dir,true),true,Duration.ofHours(1),Duration.ofHours(2));
+        e.run(start);current.set(new Reconciliation.Candidate(player.uuid(),"Donor","default","devotee-founder"));
+        e.run(start.plusSeconds(3600));assertEquals(0,removed[0]);
+        e.run(start.plusSeconds(7200));assertEquals(1,removed[0]);
+    }
+    @Test void auditReportsBothDirectVariantsAfterIndependentPersistedConfirmations() throws Exception {
+        var founder = new Reconciliation.Candidate(player.uuid(), "Donor", "default", "devotee-founder");
+        var normal = new Reconciliation.Candidate(player.uuid(), "Donor", "default", "devotee");
+        var both = new Reconciliation.Ranks() {
+            public List<Reconciliation.Candidate> candidates() { return List.of(normal, founder); }
+            public boolean eligible(Reconciliation.Candidate c) { return true; }
+            public boolean remove(Reconciliation.Candidate c) { fail("audit cannot remove ranks"); return false; }
+        };
+        var store = new ReconciliationFiles(dir, false);
+        new Reconciliation(both, c -> evidence, store, false, Duration.ofHours(1), Duration.ofHours(2)).run(start);
+        assertEquals(2, store.load().size());
+        var result = new Reconciliation(both, c -> evidence, store, false, Duration.ofHours(1), Duration.ofHours(2)).run(start.plusSeconds(3600));
+        assertEquals(2, result.proposed());
+        var audit = java.nio.file.Files.readString(dir.resolve("audit.jsonl"));
+        assertTrue(audit.contains("\"target_group\":\"devotee\""));
+        assertTrue(audit.contains("\"target_group\":\"devotee-founder\""));
     }
 }

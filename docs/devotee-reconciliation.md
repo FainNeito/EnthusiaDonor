@@ -1,5 +1,10 @@
 # Missed Devotee expiry reconciliation
 
+> Founder-variant extension in progress: see
+> [devotee-founder-expiry.md](devotee-founder-expiry.md). The protections below
+> remain the defaults; the extension adds separately opted-in direct-node
+> cleanup for protected-role holders while leaving those roles untouched.
+
 ## Spec
 
 Canonical base fetched 2026-10-15: `3c50f93486464dc8b90dd04345ee0101cdcd1254`.

@@ -16,6 +16,8 @@ entitlements:
   devotee-package-ids: [] # All Devotee subscription package IDs; store's current ID is 7053397.
   check-interval-minutes: 15
   confirmation-minutes: 60 # At least two successful checks; minimum 15 minutes.
+    reconcile-founder-variant: false # Explicitly include direct devotee-founder memberships.
+    allow-direct-removal-from-protected-groups: false # Override built-in group holds only; explicitly protected groups remain held.
   timeout-seconds: 10
   max-users: 100
   max-history-per-user: 100
