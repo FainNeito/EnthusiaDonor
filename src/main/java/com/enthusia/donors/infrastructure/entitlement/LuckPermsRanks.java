@@ -37,15 +37,11 @@ public final class LuckPermsRanks implements Reconciliation.Ranks {
             String name = user.getUsername();
             if (name == null || name.isBlank()) continue;
             var variants = settings.reconcileFounderVariant() ? List.of("devotee", "devotee-founder") : List.of("devotee");
-            Candidate fallback = null, selected = null;
             for (String variant : variants) {
                 String key = "group." + variant;
                 if (user.data().toCollection().stream().noneMatch(n -> n.getKey().equals(key))) continue;
-                var candidate = new Candidate(uuid, name, user.getPrimaryGroup(), variant);
-                if (fallback == null) fallback = candidate;
-                if (eligibleNode(user, candidate) != null) { selected = candidate; break; }
+                candidates.add(new Candidate(uuid, name, user.getPrimaryGroup(), variant));
             }
-            if (selected != null || fallback != null) candidates.add(selected == null ? fallback : selected);
         }
         return List.copyOf(candidates);
     }

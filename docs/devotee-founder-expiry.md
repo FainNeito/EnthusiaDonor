@@ -17,6 +17,7 @@ the group name. Multiple active configured packages protect both variants.
 - When both variants exist, the reconciler shall process them separately and
   use a fresh group-specific confirmation window for each target. A pending
   observation for one group shall not authorize removal of the other group.
+  Audit mode shall report both independently without removing either rank.
 - When the targeted subscription is removed, Founder, Avid, Media, Glorious,
   staff and all unrelated direct and inherited groups shall remain untouched.
   Their inheritance may still provide Devotee gameplay permissions.
@@ -58,9 +59,9 @@ configuration explicitly lists protected groups; an operator must deliberately
 adjust that list for the requested accounts before cleanup can proceed. When both options are enabled, the
 operator is allowing removal of the specific expired subscription node for a
 Founder, Media or Glorious holder; all other nodes and shared group definitions
-remain unchanged. Higher ranks may still grant inherited perks. Existing saved
-confirmation records lack a target-specific fingerprint and will restart their
-confirmation period after this update.
+remain unchanged. Higher ranks may still grant inherited perks. State version 2
+keys observations by UUID and target group. Version 1 observations are discarded
+and start a fresh confirmation period; unsupported future versions are rejected.
 
 ## Current evidence
 
@@ -72,9 +73,10 @@ API, then compiled and passed against this work for separate variant confirmatio
 active-entitlement protection and rejected unsupported targets. Evidence is in
 `operations/donor-founder-expiry-20261031/`. This is only a domain probe; the
 LuckPerms adapter and settings tests then ran in the complete offline Maven
-verification with Java 25: 277 tests passed, with no failures, errors or skips.
+verification with Java 25: 278 tests passed, with no failures, errors or skips.
 The initial full test run exposed two uninitialized LuckPerms fixture errors;
 the fixtures were corrected and a user-limit test was strengthened to assert
 the actual bound failure. The separate run logs are retained in
-`operations/donor-founder-expiry-20261031/`. Hosted checks and review remain pending.
+`operations/donor-founder-expiry-20261031/`. Hosted checks and review for the
+latest revision remain pending.
 No Paper, player, or live-rank acceptance is claimed.

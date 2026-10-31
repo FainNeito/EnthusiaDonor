@@ -189,7 +189,12 @@ class LuckPermsRanksTest {
         when(manager.<Node>searchAll(any())).thenReturn(CompletableFuture.completedFuture(first), CompletableFuture.completedFuture(second));
         try (var matchers = mockStatic(NodeMatcher.class)) {
             matchers.when(() -> NodeMatcher.key(anyString())).thenReturn(mock(NodeMatcher.class));
-            assertEquals(List.of(new Candidate(uuid, "Donor", "default", "devotee-founder")), founderEnabled().candidates());
+            var adapter = founderEnabled();
+            var normal = new Candidate(uuid, "Donor", "default", "devotee");
+            var founder = new Candidate(uuid, "Donor", "default", "devotee-founder");
+            assertEquals(List.of(normal, founder), adapter.candidates());
+            assertFalse(adapter.eligible(normal));
+            assertTrue(adapter.eligible(founder));
         }
     }
     @Test void combinedVariantDiscoveryAppliesUserLimitBeforeLoadingUsers() throws Exception {

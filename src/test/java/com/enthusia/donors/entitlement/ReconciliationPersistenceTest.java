@@ -18,15 +18,15 @@ class ReconciliationPersistenceTest {
     }
     @Test void journalFailurePreventsRankMutation() throws Exception {
         int[] changes = {0}; var id = UUID.randomUUID(); var start = Instant.parse("2026-10-15T00:00:00Z");
-        var stored = new HashMap<UUID, Reconciliation.Pending>();
+        var stored = new HashMap<Reconciliation.Target, Reconciliation.Pending>();
         var ranks = new Reconciliation.Ranks() {
             public List<Reconciliation.Candidate> candidates() { return List.of(new Reconciliation.Candidate(id, "Donor")); }
             public boolean eligible(Reconciliation.Candidate c) { return true; }
             public boolean remove(Reconciliation.Candidate c) { changes[0]++; return true; }
         };
         var store = new Reconciliation.Store() {
-            public Map<UUID, Reconciliation.Pending> load() { return Map.copyOf(stored); }
-            public void save(Map<UUID, Reconciliation.Pending> data) { stored.clear(); stored.putAll(data); }
+            public Map<Reconciliation.Target, Reconciliation.Pending> load() { return Map.copyOf(stored); }
+            public void save(Map<Reconciliation.Target, Reconciliation.Pending> data) { stored.clear(); stored.putAll(data); }
             public void audit(Reconciliation.Candidate c, Instant now, String outcome) throws Exception { throw new java.io.IOException("disk full"); }
         };
         var e = new Reconciliation(ranks, c -> new Reconciliation.Evidence(Reconciliation.State.INACTIVE, "verified"), store,

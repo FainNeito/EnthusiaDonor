@@ -17,27 +17,31 @@ public final class ReconciliationFiles implements Reconciliation.Store {
     public ReconciliationFiles(Path directory, boolean enforce) throws Exception {
         this.directory = directory; this.enforce = enforce; Files.createDirectories(directory);
     }
-    public Map<UUID, Pending> load() throws Exception {
+    public Map<Target, Pending> load() throws Exception {
         Path file = directory.resolve("pending.json");
         if (!Files.exists(file)) return new HashMap<>();
         var root = JsonParser.parseString(Files.readString(file)).getAsJsonObject();
-        if (root.get("version").getAsInt() != 1) throw new IllegalStateException("Unknown reconciliation state version");
+        int version = root.get("version").getAsInt();
+        if (version == 1) return new HashMap<>(); // Old UUID-only observations cannot prove a specific target.
+        if (version != 2) throw new IllegalStateException("Unknown reconciliation state version");
         if (root.get("enforce").getAsBoolean() != enforce) return new HashMap<>();
-        var result = new HashMap<UUID, Pending>();
+        var result = new HashMap<Target, Pending>();
         for (var item : root.getAsJsonObject("pending").entrySet()) {
             var value = item.getValue().getAsJsonObject();
-            result.put(UUID.fromString(item.getKey()), new Pending(value.get("fingerprint").getAsString(),
+            String[] key = item.getKey().split("\\|", -1);
+            if (key.length != 2) throw new IllegalStateException("Invalid reconciliation target key");
+            result.put(new Target(UUID.fromString(key[0]), key[1]), new Pending(value.get("fingerprint").getAsString(),
                     Instant.parse(value.get("first").getAsString()), Instant.parse(value.get("last").getAsString()), value.get("checks").getAsInt()));
         }
         return result;
     }
-    public void save(Map<UUID, Pending> pending) throws Exception {
-        var root = new JsonObject(); root.addProperty("version", 1); root.addProperty("enforce", enforce);
+    public void save(Map<Target, Pending> pending) throws Exception {
+        var root = new JsonObject(); root.addProperty("version", 2); root.addProperty("enforce", enforce);
         var entries = new JsonObject();
         for (var item : pending.entrySet()) {
             var value = new JsonObject(); value.addProperty("fingerprint", item.getValue().fingerprint());
             value.addProperty("first", item.getValue().first().toString()); value.addProperty("last", item.getValue().last().toString());
-            value.addProperty("checks", item.getValue().checks()); entries.add(item.getKey().toString(), value);
+            value.addProperty("checks", item.getValue().checks()); entries.add(item.getKey().uuid() + "|" + item.getKey().group(), value);
         }
         root.add("pending", entries);
         Path temp = directory.resolve("pending.json.tmp");
