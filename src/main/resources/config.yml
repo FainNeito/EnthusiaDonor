@@ -4,6 +4,8 @@ runtime:
   mode: legacy # legacy preserves original exports/commands; donor-network explicitly opts into the new adapter.
 
 glorious:
+  # Requires reviewed schema, a publisher lease, LuckPerms and verified payers.
+  live-enabled: false
   minimum-monthly-donation: "30.00"
 
 # Real Tebex notifications, separate from testing.yml previews. Restart after changes.

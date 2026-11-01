@@ -15,6 +15,8 @@ import org.bukkit.scheduler.BukkitTask;
 
 import java.time.Instant;
 import java.time.YearMonth;
+import java.time.Clock;
+import java.math.BigDecimal;
 import java.security.MessageDigest;
 import java.nio.charset.StandardCharsets;
 import java.util.HexFormat;
@@ -24,6 +26,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 /** Official Tebex read path for public displays; test purchases never enter this repository. */
 public final class OfficialDonorReadService implements AutoCloseable {
@@ -41,8 +44,18 @@ public final class OfficialDonorReadService implements AutoCloseable {
     private final AtomicBoolean inFlight = new AtomicBoolean();
     private BukkitTask schedule;
     private volatile boolean closed;
+    private volatile com.enthusia.donors.glorious.AwardCoordinator.Grant gloriousGrant;
+    private volatile com.enthusia.donors.infrastructure.glorious.GloriousPublisherCycle gloriousCycle;
+    private volatile com.enthusia.donors.infrastructure.glorious.GloriousAwardService gloriousService;
+    private volatile long gloriousEpoch;
+    private final AtomicReference<Set<String>> gloriousExclusions=new AtomicReference<>(Set.of());
     private com.enthusia.donors.sandbox.official.notifications.PaymentAnnouncements announcements;
     public void announcements(com.enthusia.donors.sandbox.official.notifications.PaymentAnnouncements value) {announcements=value;}
+    public void enableGlorious(com.enthusia.donors.glorious.AwardCoordinator.Grant grant) {
+        if(shared==null || config.network().mode()!=NetworkSettings.Mode.PUBLISHER)
+            throw new IllegalStateException("Glorious requires a shared publisher");
+        gloriousGrant=java.util.Objects.requireNonNull(grant);
+    }
 
     public OfficialDonorReadService(JavaPlugin plugin, ConfigManager config) {
         this.plugin = plugin;
@@ -54,6 +67,8 @@ public final class OfficialDonorReadService implements AutoCloseable {
     }
 
     public DonorCache cache() { return cache; }
+    public boolean gloriousAvailable() {return !closed && gloriousGrant!=null && gloriousService!=null && shared!=null
+            && shared.ownsLease() && shared.leaseEpoch()==gloriousEpoch;}
     public String networkStatus() {return shared==null?"standalone":config.network().mode()+" | source "+config.network().sourceId()
             +" | revision "+shared.revision()+" | read "+shared.readState()+" | publisher lease "+shared.ownsLease();}
 
@@ -97,8 +112,13 @@ public final class OfficialDonorReadService implements AutoCloseable {
         }
         if (!inFlight.compareAndSet(false, true)) return CompletableFuture.completedFuture(false);
         cache.markAttempt();
-        return tebex.fetchPayments(current)
-                .thenCombine(tebex.resolveExcludedPaymentIdHashes(current), RefreshData::new)
+        java.util.function.Supplier<CompletableFuture<RefreshData>> fetch=()->tebex.fetchPayments(current)
+                .thenCombine(tebex.resolveExcludedPaymentIdHashes(current),RefreshData::new);
+        var fetched=gloriousGrant!=null && shared!=null
+                ? com.enthusia.donors.infrastructure.glorious.GloriousActivationSequencer.beforeFetch(io,
+                    ()->initializeGlorious(current,publicationEpoch),fetch)
+                : fetch.get();
+        return fetched
                 .thenApplyAsync(data -> {
                     try {
                         int count = repository.upsertPayments(data.payments());
@@ -106,6 +126,7 @@ public final class OfficialDonorReadService implements AutoCloseable {
                         List<DonorEntry> donors = repository.rebuildTotals(current, data.excludedHashes(), reconciledAt);
                         if(shared==null)cache.replace(donors, Instant.now(), RefreshState.OK);
                         else shared.publish(donors,current,publicationEpoch,reconciledAt);
+                        if(gloriousGrant!=null && shared!=null)kickGlorious(current,data.excludedHashes(),publicationEpoch);
                         if(announcements!=null && (shared==null || shared.ownsLease() && shared.leaseEpoch()==publicationEpoch))announcements.accept(data.payments(),data.excludedHashes(),current);
                         plugin.getLogger().info("Official Tebex donor refresh complete: " + count + " payments, " + donors.size() + " donors.");
                         return true;
@@ -125,6 +146,85 @@ public final class OfficialDonorReadService implements AutoCloseable {
     private static boolean hasKey(DonorsConfig config) {
         return config.tebexApiKey() != null && !config.tebexApiKey().isBlank();
     }
+
+    /** Runs on the official IO worker; database and strict Tebex operations never block the server thread. */
+    private void kickGlorious(DonorsConfig current,Set<String> exclusions,long epoch) {
+        if(closed || gloriousGrant==null || !shared.ownsLease() || shared.leaseEpoch()!=epoch)return;
+        gloriousExclusions.set(Set.copyOf(exclusions));
+        initializeGlorious(current,epoch);
+        if(gloriousCycle==null || gloriousEpoch!=epoch)return;
+        gloriousCycle.tick().whenComplete((result,error)->{
+            if(error!=null)plugin.getLogger().warning("Glorious review held: official scan or award processing failed.");
+            else if(result==com.enthusia.donors.infrastructure.glorious.GloriousPublisherCycle.Result.HELD)
+                plugin.getLogger().warning("Glorious award held for review or incomplete data.");
+        });
+    }
+    /** Called on the IO worker before Tebex access so the database establishes the activation time. */
+    private void initializeGlorious(DonorsConfig current,long epoch) {
+        if(closed || gloriousGrant==null || shared==null || !shared.ownsLease() || shared.leaseEpoch()!=epoch)return;
+        try {
+            if(gloriousCycle==null || gloriousEpoch!=epoch) {
+                if(gloriousCycle!=null)gloriousCycle.close();
+                var service=shared.startGlorious(epoch,current.timezone(),player -> {
+                    if(closed || !shared.ownsLease() || shared.leaseEpoch()!=epoch)
+                        return com.enthusia.donors.glorious.AwardCoordinator.GrantResult.HELD;
+                    return gloriousGrant.apply(player);
+                });
+                gloriousService=service;
+                gloriousEpoch=epoch;
+                gloriousCycle=new com.enthusia.donors.infrastructure.glorious.GloriousPublisherCycle(
+                        service.boundary(),()->!closed && shared.ownsLease() && shared.leaseEpoch()==epoch,
+                        ()->tebex.fetchVerifiedAwardPayments(current),
+                        (month,now,scan)->service.evaluate(month,now,scan,current,gloriousExclusions.get(),
+                                new BigDecimal(config.glorious().minimumAmount())).result(),io,Clock.systemUTC());
+            }
+        } catch(Exception failure) {
+            plugin.getLogger().warning("Glorious initialization held: verify shared schema, lease and LuckPerms.");
+        }
+    }
+
+    public CompletableFuture<Set<String>> gloriousPending(YearMonth month) {
+        var service=gloriousService;var current=config.get();long epoch=gloriousEpoch;
+        if(service==null || closed || shared==null || !shared.ownsLease() || shared.leaseEpoch()!=epoch)
+            return CompletableFuture.failedFuture(new IllegalStateException("Glorious publisher is not ready"));
+        return tebex.fetchVerifiedAwardPayments(current).thenCombine(tebex.resolveExcludedPaymentIdHashes(current),
+                (scan,exclusions)->new GloriousReviewData(scan,exclusions)).thenApplyAsync(data->{
+            try {if(closed || !shared.ownsLease() || shared.leaseEpoch()!=epoch)throw new IllegalStateException("Publisher lease lost");
+                return service.pending(month,Instant.now(),data.scan(),current,data.exclusions());}
+            catch(Exception failure){throw new java.util.concurrent.CompletionException(failure);}
+        },io);
+    }
+    public CompletableFuture<Void> gloriousReview(YearMonth month,String hash,java.util.UUID payer,java.util.UUID reviewer,String evidence) {
+        var service=gloriousService;var current=config.get();long epoch=gloriousEpoch;
+        if(service==null || closed || shared==null || !shared.ownsLease() || shared.leaseEpoch()!=epoch)
+            return CompletableFuture.failedFuture(new IllegalStateException("Glorious publisher is not ready"));
+        return tebex.fetchVerifiedAwardPayments(current).thenCombine(tebex.resolveExcludedPaymentIdHashes(current),
+                (scan,exclusions)->new GloriousReviewData(scan,exclusions)).thenApplyAsync(data->{
+            try {if(closed || !shared.ownsLease() || shared.leaseEpoch()!=epoch)throw new IllegalStateException("Publisher lease lost");
+                service.review(month,Instant.now(),data.scan(),current,data.exclusions(),hash,payer,reviewer,evidence);return null;}
+            catch(Exception failure){throw new java.util.concurrent.CompletionException(failure);}
+        },io);
+    }
+    public CompletableFuture<Void> gloriousConfirm(YearMonth month,java.util.UUID winner,java.util.UUID reviewer,String evidence) {
+        var service=gloriousService;long epoch=gloriousEpoch;
+        if(service==null || closed || shared==null || !shared.ownsLease() || shared.leaseEpoch()!=epoch)
+            return CompletableFuture.failedFuture(new IllegalStateException("Glorious publisher is not ready"));
+        return CompletableFuture.runAsync(()->{
+            try {if(closed || !shared.ownsLease() || shared.leaseEpoch()!=epoch)throw new IllegalStateException("Publisher lease lost");
+                service.confirmUncertain(month,winner,reviewer,evidence);}
+            catch(Exception failure){throw new java.util.concurrent.CompletionException(failure);}
+        },io);
+    }
+    public CompletableFuture<java.util.Optional<com.enthusia.donors.glorious.AwardDecision>> gloriousStatus(YearMonth month) {
+        var service=gloriousService;long epoch=gloriousEpoch;
+        if(service==null || closed || shared==null || !shared.ownsLease() || shared.leaseEpoch()!=epoch)
+            return CompletableFuture.failedFuture(new IllegalStateException("Glorious publisher is not ready"));
+        return CompletableFuture.supplyAsync(()->{
+            try {if(closed || !shared.ownsLease() || shared.leaseEpoch()!=epoch)throw new IllegalStateException("Publisher lease lost");return service.status(month);}
+            catch(Exception failure){throw new java.util.concurrent.CompletionException(failure);}
+        },io);
+    }
+    private record GloriousReviewData(com.enthusia.donors.tebex.StableAwardScan scan,Set<String> exclusions) { }
 
     static List<DonorEntry> forCurrentMonth(List<DonorEntry> saved, Instant updatedAt, DonorsConfig config) {
         YearMonth savedMonth = YearMonth.from(updatedAt.atZone(config.timezone()));
@@ -150,6 +250,7 @@ public final class OfficialDonorReadService implements AutoCloseable {
 
     @Override public void close() {
         closed = true;
+        if(gloriousCycle!=null)gloriousCycle.close();
         if (schedule != null) schedule.cancel();
         if(shared!=null)shared.close();
         io.shutdownNow();

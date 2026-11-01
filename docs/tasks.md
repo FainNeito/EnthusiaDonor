@@ -1,5 +1,20 @@
 # EnthusiaDonor Tasks
 
+## Live Glorious monthly award — 2026-11-01
+
+- [x] Identify sandbox/live gap and authoritative current main.
+- [ ] Specify verified identities, official closed-month accounting, currency,
+  idempotent shared finalization and safe optional LuckPerms grant lifecycle.
+- [ ] Preserve official payment completeness metadata; the current parser
+  silently skips records with missing player identity and cannot authorize a
+  permanent award without an additional fail-closed input contract.
+- [ ] Add focused regression proof and implement the domain, storage and
+  platform adapters with network publisher fencing and durable uncertainty.
+- [ ] Verify complete build, companion LuckPerms API, failure/restart and
+  concurrency paths; deliver reviewable PR without production activation.
+- [ ] Inventory sandbox features against actual live capabilities.
+
+
 ## Real purchase incident — 2026-10-09
 
 - [x] Create approved dedicated database; keep restricted source address.
@@ -136,3 +151,50 @@ Requirements:
 - Do not flatten the gradients to a single color.
 - Do not include the testing marker as part of the rank text.
 - Keep the rank strings configurable in the bulk-update config rather than hard-coding them.
+
+## Live Glorious award implementation — work in progress
+
+- User decisions: only months ending after activation; hold if a buyer cannot
+  be verified, including gifts; default qualifying amount USD 30.00 configurable.
+- Pure selection, strict source checks, journal and LuckPerms adapter have 25
+  focused offline tests (Roundtable 3257/3259). They are not wired into runtime.
+- Remaining: auditable buyer verification/review flow; closed-month scheduler and
+  persisted activation; lease-fenced schema migration and MariaDB concurrency;
+  real runtime integration and failure handling; full review/CI and PR. Do not
+  activate or claim an automatic production award until these are complete.
+- Closed-month award-cycle guard added and tested (29 focused tests, Roundtable
+  3267/3268). A scan begun before month end cannot finalize that month. This
+  remains isolated code; no scheduler, verification operator flow, or real grant
+  is connected to the live plugin.
+- Review journal and SQLite fixture implemented; 30 focused offline tests pass
+  (Roundtable 3279/3280). The review queue adapter is pending its focused test.
+  Authenticated review commands, authorization, payer evidence validation,
+  real MariaDB concurrency, runtime wiring, PR and activation remain open.
+- Review-to-award service assembled and tested with a local SQLite fixture: 32
+  focused tests pass (Roundtable 3291/3292). Live publisher triggering, secure
+  review commands, real database / LuckPerms acceptance and delivery remain.
+- Source scan evidence now uses an immutable Tebex-created object (33 focused
+  tests, Roundtable 3301/3302). Matching scans are not a transactional snapshot;
+  publisher integration and completeness policy still need review.
+- Publisher cycle and lease-bound service factory implemented in isolated source;
+  37 focused offline tests pass (Roundtable 3315/3316). Runtime startup/scheduler
+  hookup and authenticated reviewer interface remain unfinished and inactive.
+- Disabled-by-default Paper publisher and restricted review command code now
+  exists locally; full offline suite passed 240 tests, no skips (3330/3331).
+  Paper/LuckPerms acceptance, MariaDB concurrency, uncertain-grant recovery,
+  CI, review and PR remain. No production activation is authorized or implied.
+- Isolated native MariaDB 11.8.3 concurrency and audited uncertain-confirmation
+  fixtures passed (3338/3339 and 3346/3347); full offline Maven 241 tests passed
+  (3340/3341). The confirmation is a human attestation and never grants a rank.
+  Paper/LuckPerms acceptance, GRANTING recovery, review/CI/PR remain open.
+- Legacy mode now rejects enabled live Glorious; full local package 242 tests
+  passed (3361/3363). Disposable Paper reached donor startup and held without a
+  publisher, but LuckPerms FAILED to load because its dependencies were unavailable
+  under offline proxy. No successful Paper/LuckPerms acceptance is claimed.
+- Activation is persisted before Tebex lookups; full offline suite passed 245
+  tests including database-backed outage regression (3407/3408). Prior isolated
+  Paper/LuckPerms synthetic grant and recovery probe passed before this change.
+  End-to-end publisher, reviewer usability, CI, review and activation remain.
+- Hold a closed month containing pending Tebex payments to avoid premature
+  no-winner or wrong-winner decisions. Full offline suite 246/246 passed
+  (3419/3420); final-source Paper/LuckPerms and live verification remain.
