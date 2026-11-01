@@ -7,7 +7,12 @@ import static org.junit.jupiter.api.Assertions.*;
 class TebexAwardCompletenessTest {
     private final TebexClient client=new TebexClient(Logger.getAnonymousLogger());
     private static String page(String payment) {return "{\"data\":["+payment+"],\"current_page\":1,\"last_page\":1,\"total\":1,\"per_page\":25}";}
-    private static final String COMPLETE="{\"id\":1,\"amount\":\"30.00\",\"status\":\"Complete\",\"date\":\"2026-10-01T00:00:00Z\",\"currency\":{\"iso_4217\":\"USD\"},\"player\":{\"uuid\":\"365bfa21803249ee9b634fe890c9d43f\",\"name\":\"Donor\"}}";
+    private static final String COMPLETE="{\"id\":1,\"packages\":[{\"id\":123}],\"amount\":\"30.00\",\"status\":\"Complete\",\"date\":\"2026-10-01T00:00:00Z\",\"currency\":{\"iso_4217\":\"USD\"},\"player\":{\"uuid\":\"365bfa21803249ee9b634fe890c9d43f\",\"name\":\"Donor\"}}";
+    @Test void missingOrMalformedPackageMetadataCannotBypassExclusions() {
+        String packages="\"packages\":[{\"id\":123}],";
+        for(String replacement:java.util.List.of("", "\"packages\":null,", "\"packages\":[],", "\"packages\":[{}],", "\"packages\":[\"bad\"],"))
+            assertThrows(TebexClient.TebexException.class,()->client.parseAwardPayments(page(COMPLETE.replace(packages,replacement))));
+    }
     @Test void validPageCanBeUsedForFurtherAwardVerification() {
         assertEquals(1,client.parseAwardPayments(page(COMPLETE)).payments().size());
     }

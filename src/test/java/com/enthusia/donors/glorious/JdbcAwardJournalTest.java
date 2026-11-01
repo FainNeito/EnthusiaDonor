@@ -120,7 +120,6 @@ class JdbcAwardJournalTest {
         journal.decide("owner",7,UTC,AwardDecision.winner(month,winner));
         assertThrows(SQLException.class,()->journal.confirmUncertain("owner",7,month,winner,reviewer,"b".repeat(64)));
         assertTrue(journal.transition("owner",7,month,AwardDecision.State.READY,AwardDecision.State.GRANTING));
-        assertThrows(SQLException.class,()->journal.confirmUncertain("owner",7,month,winner,reviewer,"b".repeat(64)));
         assertTrue(journal.transition("owner",7,month,AwardDecision.State.GRANTING,AwardDecision.State.UNCERTAIN));
         assertThrows(SQLException.class,()->journal.confirmUncertain("owner",8,month,winner,reviewer,"b".repeat(64)));
         assertThrows(SQLException.class,()->journal.confirmUncertain("owner",7,month,UUID.randomUUID(),reviewer,"b".repeat(64)));
@@ -130,5 +129,23 @@ class JdbcAwardJournalTest {
         try(Connection c=open();Statement s=c.createStatement();ResultSet r=s.executeQuery("SELECT reviewer_uuid,evidence_digest FROM enthusiadonors_glorious_recoveries")) {
             assertTrue(r.next());assertEquals(reviewer.toString(),r.getString(1));assertEquals("b".repeat(64),r.getString(2));assertFalse(r.next());
         }
+    }
+    @Test void interruptedGrantCanBeConfirmedWithEvidenceWithoutGranting() throws Exception {
+        setup();var month=YearMonth.now(UTC).minusMonths(1);seedActivation(month.atDay(1).atStartOfDay(UTC).toInstant());
+        var journal=new JdbcAwardJournal(this::open,JdbcAwardJournal.Dialect.SQLITE,"test");var winner=UUID.randomUUID();
+        journal.decide("owner",7,UTC,AwardDecision.winner(month,winner));
+        assertTrue(journal.transition("owner",7,month,AwardDecision.State.READY,AwardDecision.State.GRANTING));
+        assertThrows(SQLException.class,()->journal.confirmUncertain("owner",7,month,UUID.randomUUID(),UUID.randomUUID(),"a".repeat(64)));
+        assertTrue(journal.confirmUncertain("owner",7,month,winner,UUID.randomUUID(),"a".repeat(64)));
+        assertEquals(AwardDecision.State.AWARDED,journal.findDecision("owner",7,month).orElseThrow().state());
+    }
+    @Test void guardedGrantChecksDatabaseLeaseBeforeCallingAdapter() throws Exception {
+        setup();var journal=new JdbcAwardJournal(this::open,JdbcAwardJournal.Dialect.SQLITE,"test");var calls=new java.util.concurrent.atomic.AtomicInteger();
+        assertThrows(SQLException.class,()->journal.guardedGrant("owner",8,UUID.randomUUID(),(player,valid)->{calls.incrementAndGet();return AwardCoordinator.GrantResult.SAVED;}));
+        assertEquals(0,calls.get());
+        assertEquals(AwardCoordinator.GrantResult.HELD,journal.guardedGrant("owner",7,UUID.randomUUID(),(player,valid)->{
+            assertTrue(valid.getAsBoolean());calls.incrementAndGet();return AwardCoordinator.GrantResult.HELD;
+        }));
+        assertEquals(1,calls.get());
     }
 }

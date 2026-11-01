@@ -139,19 +139,19 @@ public final class JdbcAwardJournal {
             return Map.copyOf(values);
         });
     }
-    /** Record a human attestation that an UNCERTAIN winner already has the rank; never grant or retry. */
+    /** Record a human attestation that an interrupted or uncertain winner already has the rank. */
     public boolean confirmUncertain(String token,long epoch,YearMonth month,UUID winner,UUID reviewer,String evidenceDigest) throws SQLException {
         Objects.requireNonNull(month);Objects.requireNonNull(winner);Objects.requireNonNull(reviewer);
         if(evidenceDigest==null || !evidenceDigest.matches("[0-9a-f]{64}"))throw new IllegalArgumentException("Recovery requires a lowercase SHA-256 evidence digest");
         return transaction(token,epoch,(c,now)->{
             AwardDecision decision=read(c,month);
             if(!winner.equals(decision.winner()))throw new SQLException("Recovery winner does not match decision");
-            if(decision.state()!=AwardDecision.State.UNCERTAIN)throw new SQLException("Only an uncertain award can be confirmed");
+            if(decision.state()!=AwardDecision.State.UNCERTAIN && decision.state()!=AwardDecision.State.GRANTING)throw new SQLException("Only an interrupted or uncertain award can be confirmed");
             try(PreparedStatement p=c.prepareStatement("INSERT INTO enthusiadonors_glorious_recoveries(source_id,month_key,winner_uuid,reviewer_uuid,evidence_digest,resolved_at) VALUES (?,?,?,?,?,?)")) {
                 p.setString(1,source);p.setString(2,month.toString());p.setString(3,winner.toString());p.setString(4,reviewer.toString());p.setString(5,evidenceDigest);p.setLong(6,now);p.executeUpdate();
             }
             try(PreparedStatement p=c.prepareStatement("UPDATE enthusiadonors_glorious_awards SET state=? WHERE source_id=? AND month_key=? AND state=? AND winner_uuid=?")) {
-                p.setString(1,AwardDecision.State.AWARDED.name());p.setString(2,source);p.setString(3,month.toString());p.setString(4,AwardDecision.State.UNCERTAIN.name());p.setString(5,winner.toString());
+                p.setString(1,AwardDecision.State.AWARDED.name());p.setString(2,source);p.setString(3,month.toString());p.setString(4,decision.state().name());p.setString(5,winner.toString());
                 if(p.executeUpdate()!=1)throw new SQLException("Uncertain award changed during recovery");
             }
             return true;
@@ -161,12 +161,21 @@ public final class JdbcAwardJournal {
     public boolean transition(String token,long epoch,YearMonth month,AwardDecision.State expected,AwardDecision.State next) throws SQLException {
         Objects.requireNonNull(month);
         if(!((expected==AwardDecision.State.READY && next==AwardDecision.State.GRANTING)
-                || (expected==AwardDecision.State.GRANTING && (next==AwardDecision.State.AWARDED || next==AwardDecision.State.UNCERTAIN))))
+                || (expected==AwardDecision.State.GRANTING && (next==AwardDecision.State.AWARDED || next==AwardDecision.State.UNCERTAIN || next==AwardDecision.State.READY))))
             throw new IllegalArgumentException("Invalid state transition");
         return transaction(token,epoch,(c,now)->{
             try(PreparedStatement p=c.prepareStatement("UPDATE enthusiadonors_glorious_awards SET state=? WHERE source_id=? AND month_key=? AND state=?")) {
                 p.setString(1,next.name());p.setString(2,source);p.setString(3,month.toString());p.setString(4,expected.name());return p.executeUpdate()==1;
             }
         });
+    }
+
+    /** Hold the publisher row lock across the external grant, preventing lease takeover. */
+    public AwardCoordinator.GrantResult guardedGrant(String token,long epoch,UUID player,
+            java.util.function.BiFunction<UUID,java.util.function.BooleanSupplier,AwardCoordinator.GrantResult> grant) throws SQLException {
+        return transaction(token,epoch,(connection,now) -> grant.apply(player,() -> {
+            try { lockLease(connection,token,epoch); return true; }
+            catch(SQLException lost) { return false; }
+        }));
     }
 }

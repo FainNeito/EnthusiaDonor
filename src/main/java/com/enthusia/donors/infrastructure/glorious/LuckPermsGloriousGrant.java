@@ -15,18 +15,21 @@ public final class LuckPermsGloriousGrant {
 
     /** Invoke after durably recording GRANTING. Any uncertain save remains held for operator review. */
     public Result grant(UUID player) {
-        if(player==null || stopped.getAsBoolean() || api.getGroupManager().getGroup("glorious")==null) return Result.HELD;
+        return grant(player,()->true);
+    }
+    public Result grant(UUID player, BooleanSupplier validLease) {
+        if(player==null || stopped.getAsBoolean() || !validLease.getAsBoolean() || api.getGroupManager().getGroup("glorious")==null) return Result.HELD;
         net.luckperms.api.model.user.User user;
         try { user=api.getUserManager().loadUser(player).get(30,TimeUnit.SECONDS); }
         catch(InterruptedException interrupted) { Thread.currentThread().interrupt(); return Result.HELD; }
         catch(Exception unavailable) { return Result.HELD; }
         var nodes=user.data().toCollection().stream().filter(n->n.getKey().equals("group.glorious")).toList();
         if(nodes.size()==1 && nodes.getFirst().getValue() && !nodes.getFirst().hasExpiry() && nodes.getFirst().getContexts().isEmpty()) return Result.ALREADY_PRESENT;
-        if(!nodes.isEmpty() || stopped.getAsBoolean()) return Result.HELD;
+        if(!nodes.isEmpty() || stopped.getAsBoolean() || !validLease.getAsBoolean()) return Result.HELD;
         Node node=api.getNodeBuilderRegistry().forInheritance().group("glorious").build();
         try {
             if(!user.data().add(node).wasSuccessful()) return Result.HELD;
-            if(stopped.getAsBoolean()) return Result.UNCERTAIN;
+            if(stopped.getAsBoolean() || !validLease.getAsBoolean()) return Result.UNCERTAIN;
             api.getUserManager().saveUser(user).get(30,TimeUnit.SECONDS);
             // A message failure after a successful save is not proof that the store failed.
             try { api.getMessagingService().ifPresent(service->service.pushUserUpdate(user)); } catch(RuntimeException ignored) { }

@@ -53,4 +53,10 @@ class LuckPermsGloriousGrantTest {
         when(manager.saveUser(user)).thenReturn(CompletableFuture.failedFuture(new IllegalStateException("offline")));
         assertEquals(LuckPermsGloriousGrant.Result.UNCERTAIN,grant.grant(id));
     }
+    @Test void leaseLostDuringUserLoadNeverMutatesOrSaves() {
+        var valid=new java.util.concurrent.atomic.AtomicBoolean(true);
+        when(manager.loadUser(id)).thenAnswer(invocation->{valid.set(false);return CompletableFuture.completedFuture(user);});
+        assertEquals(LuckPermsGloriousGrant.Result.HELD,grant.grant(id,valid::get));
+        verify(data,never()).add(any());verify(manager,never()).saveUser(any());
+    }
 }

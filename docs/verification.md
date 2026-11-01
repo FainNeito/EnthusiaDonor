@@ -258,6 +258,19 @@ Real Paper/LuckPerms operation, authenticated command behavior in Paper, exact
 production schema/version migration, Tebex buyer evidence and complete-snapshot
 limits, independent code review, CI, PR and activation remain unverified.
 
+## Glorious PR review remediation — 2026-11-01
+
+The isolated PR6 fix accepts audited confirmation of interrupted GRANTING as well
+as UNCERTAIN after independent verification of durable membership. Pre-write HELD
+returns to READY, while uncertain writes do not retry. Strict award scans reject
+missing, empty or malformed package metadata. The grant holds the publisher row
+lock and revalidates database lease ownership after the user load and before the
+save. Full offline Maven passed 251 tests, no failures, errors or skips (Roundtable
+3456/3457, `operations/donor-network-verification-20261031/glorious-review-fixes-offline.log`).
+This is not proof against connection loss during an external LuckPerms write;
+native MariaDB concurrency/fault injection, actual Tebex payload compatibility,
+Paper runtime and independent review remain open. No live servers were restarted.
+
 ## Recovery, MariaDB and isolated Paper attempt — 2026-11-01
 
 The full offline package passed 242 tests, zero failures/errors/skips; local

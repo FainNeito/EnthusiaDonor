@@ -31,9 +31,9 @@ public final class AwardCoordinator {
         catch(InterruptedException interrupted) {Thread.currentThread().interrupt();outcome=GrantResult.UNCERTAIN;}
         catch(Exception uncertain) {outcome=GrantResult.UNCERTAIN;}
         AwardDecision.State next=(outcome==GrantResult.SAVED || outcome==GrantResult.ALREADY_PRESENT)
-                ? AwardDecision.State.AWARDED : AwardDecision.State.UNCERTAIN;
+                ? AwardDecision.State.AWARDED : outcome==GrantResult.HELD ? AwardDecision.State.READY : AwardDecision.State.UNCERTAIN;
         // A lost lease or failed state write leaves GRANTING as an explicit manual-review hold.
         if(!journal.transition(stored,AwardDecision.State.GRANTING,next))return Result.UNCERTAIN;
-        return next==AwardDecision.State.AWARDED?Result.AWARDED:Result.UNCERTAIN;
+        return next==AwardDecision.State.AWARDED?Result.AWARDED:next==AwardDecision.State.READY?Result.HELD:Result.UNCERTAIN;
     }
 }

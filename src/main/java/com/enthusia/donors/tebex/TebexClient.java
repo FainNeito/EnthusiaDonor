@@ -204,6 +204,11 @@ public final class TebexClient {
             try {
                 JsonObject raw=element.getAsJsonObject();
                 if(strictAwardInput) {
+                    if(!raw.has("packages") || !raw.get("packages").isJsonArray() || raw.getAsJsonArray("packages").isEmpty())
+                        throw new TebexException("Award input omitted package metadata");
+                    for(JsonElement item:raw.getAsJsonArray("packages"))
+                        if(!item.isJsonObject() || intValue(item.getAsJsonObject(),"id").filter(id -> id>0).isEmpty())
+                            throw new TebexException("Award input contained malformed package metadata");
                     if(stringValue(raw,"status").isEmpty() || stringValue(raw,"amount").isEmpty()
                             || !raw.has("currency") || !raw.get("currency").isJsonObject()
                             || stringValue(raw.getAsJsonObject("currency"),"iso_4217").isEmpty())

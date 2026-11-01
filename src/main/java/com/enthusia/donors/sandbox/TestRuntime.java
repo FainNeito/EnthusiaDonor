@@ -69,7 +69,7 @@ public final class TestRuntime implements CommandExecutor,TabCompleter,Listener,
                 if(registration==null)plugin.getLogger().warning("Glorious remains disabled: LuckPerms API is unavailable.");
                 else {
                     var adapter=new com.enthusia.donors.infrastructure.glorious.LuckPermsGloriousGrant(registration.getProvider(),()->closed || !plugin.isEnabled());
-                    officialDonors.enableGlorious(player -> com.enthusia.donors.glorious.AwardCoordinator.GrantResult.valueOf(adapter.grant(player).name()));
+                    officialDonors.enableGlorious((player,validLease) -> com.enthusia.donors.glorious.AwardCoordinator.GrantResult.valueOf(adapter.grant(player,validLease).name()));
                 }
             }
         }

@@ -2,6 +2,8 @@
 
 ## Live Glorious monthly award — 2026-11-01
 
+- [x] Address PR review: strict package metadata, safe pre-write retry, audited interrupted-grant confirmation, and lease revalidation with row lock around the grant. Full offline suite: 251/251.
+- [ ] Independently review and fault-test the lease fence against native MariaDB connection loss and simultaneous lease takeover; verify real Paper/LuckPerms and Tebex package payloads before activation. A database lock cannot make an external LuckPerms write atomic if the database connection fails during the write.
 - [x] Identify sandbox/live gap and authoritative current main.
 - [ ] Specify verified identities, official closed-month accounting, currency,
   idempotent shared finalization and safe optional LuckPerms grant lifecycle.

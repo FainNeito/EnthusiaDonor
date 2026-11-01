@@ -44,14 +44,14 @@ public final class OfficialDonorReadService implements AutoCloseable {
     private final AtomicBoolean inFlight = new AtomicBoolean();
     private BukkitTask schedule;
     private volatile boolean closed;
-    private volatile com.enthusia.donors.glorious.AwardCoordinator.Grant gloriousGrant;
+    private volatile java.util.function.BiFunction<java.util.UUID,java.util.function.BooleanSupplier,com.enthusia.donors.glorious.AwardCoordinator.GrantResult> gloriousGrant;
     private volatile com.enthusia.donors.infrastructure.glorious.GloriousPublisherCycle gloriousCycle;
     private volatile com.enthusia.donors.infrastructure.glorious.GloriousAwardService gloriousService;
     private volatile long gloriousEpoch;
     private final AtomicReference<Set<String>> gloriousExclusions=new AtomicReference<>(Set.of());
     private com.enthusia.donors.sandbox.official.notifications.PaymentAnnouncements announcements;
     public void announcements(com.enthusia.donors.sandbox.official.notifications.PaymentAnnouncements value) {announcements=value;}
-    public void enableGlorious(com.enthusia.donors.glorious.AwardCoordinator.Grant grant) {
+    public void enableGlorious(java.util.function.BiFunction<java.util.UUID,java.util.function.BooleanSupplier,com.enthusia.donors.glorious.AwardCoordinator.GrantResult> grant) {
         if(shared==null || config.network().mode()!=NetworkSettings.Mode.PUBLISHER)
             throw new IllegalStateException("Glorious requires a shared publisher");
         gloriousGrant=java.util.Objects.requireNonNull(grant);
@@ -165,10 +165,10 @@ public final class OfficialDonorReadService implements AutoCloseable {
         try {
             if(gloriousCycle==null || gloriousEpoch!=epoch) {
                 if(gloriousCycle!=null)gloriousCycle.close();
-                var service=shared.startGlorious(epoch,current.timezone(),player -> {
+                var service=shared.startGlorious(epoch,current.timezone(),(player,validLease) -> {
                     if(closed || !shared.ownsLease() || shared.leaseEpoch()!=epoch)
                         return com.enthusia.donors.glorious.AwardCoordinator.GrantResult.HELD;
-                    return gloriousGrant.apply(player);
+                    return gloriousGrant.apply(player,validLease);
                 });
                 gloriousService=service;
                 gloriousEpoch=epoch;

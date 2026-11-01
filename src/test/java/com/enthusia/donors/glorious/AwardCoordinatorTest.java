@@ -33,6 +33,14 @@ class AwardCoordinatorTest {
         assertEquals(AwardCoordinator.Result.UNCERTAIN,coordinator.process(MONTH,winner()));
         assertEquals(AwardDecision.State.UNCERTAIN,journal.current.state());assertEquals(1,calls.get());
     }
+    @Test void preWriteHoldReturnsToReadyAndRetries() throws Exception {
+        var journal=new Journal();var calls=new AtomicInteger();
+        var coordinator=new AwardCoordinator(journal,p->calls.getAndIncrement()==0?AwardCoordinator.GrantResult.HELD:AwardCoordinator.GrantResult.SAVED);
+        assertEquals(AwardCoordinator.Result.HELD,coordinator.process(MONTH,winner()));
+        assertEquals(AwardDecision.State.READY,journal.current.state());
+        assertEquals(AwardCoordinator.Result.AWARDED,coordinator.process(MONTH,winner()));
+        assertEquals(2,calls.get());
+    }
     @Test void heldDataNeverCreatesJournalOrTouchesRanks() throws Exception {
         var journal=new Journal();var calls=new AtomicInteger();
         var coordinator=new AwardCoordinator(journal,player->{calls.incrementAndGet();return AwardCoordinator.GrantResult.SAVED;});

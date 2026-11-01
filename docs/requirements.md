@@ -23,6 +23,10 @@ The test.6 JAR shows raw `%enthusiadonors_*%` tokens on donor and kill/death hol
 
 ## Glorious monthly minimum
 
+- When official award payment package metadata is missing, empty, or malformed, the award scan shall hold instead of bypassing package exclusions.
+- When LuckPerms confirms no rank mutation was attempted, the award shall return to a retryable state; an uncertain save shall remain held.
+- When an authorized reviewer verifies durable direct membership for an interrupted or uncertain grant, the system shall record the evidence and mark the award complete without changing a rank.
+- While a grant is in progress, the publisher shall hold the database lease row lock and revalidate the lease after loading the user and before saving the membership.
 - The monthly #1 donor must contribute at least the configured `glorious.minimum-monthly-donation` during that calendar month to earn Glorious. Default: $30.00; equality qualifies.
 - Sum qualifying payments credited to the payer within the existing timezone/month window. Previous months, refunds, chargebacks, and zero-dollar payments do not satisfy the minimum.
 - If the leader falls below the minimum, close the month without an award. Preserve existing permanent awards and separately labelled manual test previews.
