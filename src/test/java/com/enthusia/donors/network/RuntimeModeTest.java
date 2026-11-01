@@ -20,4 +20,10 @@ class RuntimeModeTest {
         config.set("runtime.mode","donor-network");
         assertEquals(RuntimeMode.DONOR_NETWORK,RuntimeMode.load(config));
     }
+    @Test void legacyCannotSilentlyIgnoreEnabledGlorious() {
+        var config=new YamlConfiguration();config.set("glorious.live-enabled",true);
+        assertThrows(IllegalArgumentException.class,()->RuntimeMode.load(config));
+        config.set("runtime.mode","donor-network");
+        assertEquals(RuntimeMode.DONOR_NETWORK,RuntimeMode.load(config));
+    }
 }

@@ -45,6 +45,47 @@ public final class TebexClient {
         return fetchPage(client, config, 1, new ArrayList<>());
     }
 
+    /** Two identical strict scans avoid finalizing from silently dropped or shifting pages. */
+    public CompletableFuture<StableAwardScan> fetchVerifiedAwardPayments(DonorsConfig config) {
+        Instant startedAt=Instant.now();
+        HttpClient client=HttpClient.newBuilder().connectTimeout(java.time.Duration.ofSeconds(config.timeoutSeconds())).build();
+        return fetchAwardPage(client,config,1,new AwardScan()).thenCompose(first ->
+                fetchAwardPage(client,config,1,new AwardScan()).thenApply(second -> {
+                    if(!canonical(first).equals(canonical(second)))throw new TebexException("Award payment history changed during verification");
+                    return new StableAwardScan(startedAt,Instant.now(),second,config.tebexApiKey());
+                }));
+    }
+    private static java.util.Map<String,PaymentRecord> canonical(List<PaymentRecord> records) {
+        var values=new java.util.TreeMap<String,PaymentRecord>();
+        for(var p:records) {
+            var canonical=new PaymentRecord(p.paymentIdHash(),p.playerUuid(),p.playerName(),p.amount(),p.currency(),p.status(),p.createdAt(),
+                    p.refundedOrChargeback(),p.manualPayment(),p.packageIds(),Instant.EPOCH);
+            if(values.putIfAbsent(p.paymentIdHash(),canonical)!=null)throw new TebexException("Duplicate award payment in paginated history");
+        }
+        return values;
+    }
+    private static final class AwardScan {
+        int total=-1, last=-1, perPage=-1;
+        final List<PaymentRecord> payments=new ArrayList<>();
+    }
+    private CompletableFuture<List<PaymentRecord>> fetchAwardPage(HttpClient client,DonorsConfig config,int page,AwardScan scan) {
+        if(page>config.maxPages())return CompletableFuture.failedFuture(new TebexException("Award history exceeds max-pages"));
+        URI uri=URI.create(PAYMENTS_URI+"?paged=1&page="+page);
+        HttpRequest request=HttpRequest.newBuilder(uri).timeout(java.time.Duration.ofSeconds(config.timeoutSeconds()))
+                .header("Accept","application/json").header("User-Agent","EnthusiaDonors/1.0")
+                .header("X-Tebex-Secret",config.tebexApiKey()).GET().build();
+        return client.sendAsync(request,HttpResponse.BodyHandlers.ofString()).thenCompose(response -> {
+            if(response.statusCode()<200 || response.statusCode()>=300)throw new TebexException("Award history request failed: HTTP "+response.statusCode());
+            PageResult result=parseAwardPayments(response.body());
+            if(result.currentPage()!=page)throw new TebexException("Award history page number changed");
+            if(scan.total<0) {scan.total=result.total();scan.last=result.lastPage();scan.perPage=result.perPage();}
+            else if(scan.total!=result.total() || scan.last!=result.lastPage() || scan.perPage!=result.perPage())
+                throw new TebexException("Award history pagination changed during scan");
+            scan.payments.addAll(result.payments());
+            return result.hasNextPage()?fetchAwardPage(client,config,page+1,scan):CompletableFuture.completedFuture(scan.payments);
+        });
+    }
+
     public CompletableFuture<Set<String>> resolveExcludedPaymentIdHashes(DonorsConfig config) {
         if (config.excludedTransactionIds().isEmpty()) {
             return CompletableFuture.completedFuture(Set.of());
@@ -126,6 +167,15 @@ public final class TebexClient {
     }
 
     PageResult parsePayments(String body) {
+        return parsePayments(body,false);
+    }
+
+    /** Strict award-source parsing: an omitted payment must never select the wrong winner. */
+    PageResult parseAwardPayments(String body) {
+        return parsePayments(body,true);
+    }
+
+    private PageResult parsePayments(String body, boolean strictAwardInput) {
         JsonElement root = JsonParser.parseString(body);
         if (!root.isJsonObject()) throw new TebexException("Tebex paginated response was not an object");
         JsonObject object = root.getAsJsonObject();
@@ -135,6 +185,15 @@ public final class TebexClient {
         int current = intValue(object, "current_page").orElseThrow(() -> new TebexException("Tebex paginated response omitted current_page"));
         int last = intValue(object, "last_page").orElseThrow(() -> new TebexException("Tebex paginated response omitted last_page"));
         if (current < 1 || last < current) throw new TebexException("Tebex pagination was inconsistent");
+        int total=-1, perPage=-1;
+        if(strictAwardInput) {
+            total=intValue(object,"total").orElseThrow(()->new TebexException("Award history omitted total"));
+            perPage=intValue(object,"per_page").orElseThrow(()->new TebexException("Award history omitted page size"));
+            if(total<0 || perPage<1 || last!=Math.max(1,(int)(((long)total+perPage-1)/perPage)))
+                throw new TebexException("Award history page counts inconsistent");
+            long remaining=(long)total-(long)(current-1)*perPage;
+            if(remaining<0 || data.size()!=Math.min(perPage,remaining))throw new TebexException("Award history page is incomplete");
+        }
         boolean hasNext = current < last;
         if (hasNext && data.isEmpty()) throw new TebexException("Tebex returned an empty intermediate page");
 
@@ -143,16 +202,37 @@ public final class TebexClient {
         int skipped = 0;
         for (JsonElement element : data) {
             try {
-                parsePayment(element.getAsJsonObject(), importedAt).ifPresent(payments::add);
+                JsonObject raw=element.getAsJsonObject();
+                if(strictAwardInput) {
+                    if(!raw.has("packages") || !raw.get("packages").isJsonArray() || raw.getAsJsonArray("packages").isEmpty())
+                        throw new TebexException("Award input omitted package metadata");
+                    for(JsonElement item:raw.getAsJsonArray("packages"))
+                        if(!item.isJsonObject() || intValue(item.getAsJsonObject(),"id").filter(id -> id>0).isEmpty())
+                            throw new TebexException("Award input contained malformed package metadata");
+                    if(stringValue(raw,"status").isEmpty() || stringValue(raw,"amount").isEmpty()
+                            || !raw.has("currency") || !raw.get("currency").isJsonObject()
+                            || stringValue(raw.getAsJsonObject("currency"),"iso_4217").isEmpty())
+                        throw new TebexException("Award input omitted payment status, amount, or currency");
+                    if(new BigDecimal(stringValue(raw,"amount").orElseThrow()).signum()<0)
+                        throw new TebexException("Award input contained a negative amount");
+                    if(!Set.of("complete","completed","successful","success","paid","refund","refunded","chargeback",
+                            "cancelled","canceled","failed","pending","denied","void","voided")
+                            .contains(normalizeStatus(stringValue(raw,"status").orElseThrow())))
+                        throw new TebexException("Award input contained an unknown payment status");
+                }
+                Optional<PaymentRecord> parsed=parsePayment(raw, importedAt);
+                if(strictAwardInput && parsed.isEmpty())throw new TebexException("Award input omitted a payment or player identity");
+                parsed.ifPresent(payments::add);
             } catch (Exception ex) {
                 if (ex instanceof TebexException invalidDate) throw invalidDate;
+                if (strictAwardInput) throw new TebexException("Award input contained a malformed payment");
                 skipped++;
             }
         }
         if (skipped > 0) {
             logger.warning("Skipped " + skipped + " Tebex payments with missing or invalid public player data.");
         }
-        return new PageResult(payments, hasNext, current);
+        return new PageResult(payments, hasNext, current, total, last, perPage);
     }
 
     Optional<PaymentRecord> parsePayment(JsonObject object, Instant importedAt) throws Exception {
@@ -286,7 +366,7 @@ public final class TebexClient {
         return status == null ? "" : status.trim().toLowerCase(Locale.ROOT).replace(" ", "_");
     }
 
-    record PageResult(List<PaymentRecord> payments, boolean hasNextPage, int currentPage) {
+    record PageResult(List<PaymentRecord> payments, boolean hasNextPage, int currentPage,int total,int lastPage,int perPage) {
     }
 
     public static final class TebexException extends RuntimeException {

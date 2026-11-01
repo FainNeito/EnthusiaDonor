@@ -130,3 +130,216 @@ Live Paper, PlaceholderAPI, hologram, and Tebex comparisons remain pending. This
 - Staged on Velocity 25319956: plugins/chapter 2 staging/EnthusiaDonors-VelocityRelay-1.1.0-test.15.jar and EnthusiaDonors-test15-activation.md. A proxy staging folder was created; existing active JAR/configuration were not replaced.
 - Screenshots: ../artifacts/donor-test15-staging/backend.jpg and proxy.jpg. These prove remote file presence, not active plugin loading or client/Discord delivery. No restart, reload, test/real notification, commit, push, PR or production database provisioning occurred.
 - Remaining acceptance: shared MariaDB schema/credentials and matching source/signing configuration, later approved plugin activation, baseline sync, subsequent actual payment shown across two backends and smp-chatter, live outage/shutdown recovery. Current official polling interval is 10 minutes; it can be reduced to 1 minute. Official Glorious finalization/permission grants are still separate work.
+# Live Glorious work in progress — 2026-11-01
+
+- Current-main isolated source branch `codex/glorious-monthly-awards` starts at
+  `3c50f93486464dc8b90dd04345ee0101cdcd1254`. User selected only months ending
+  after activation. No production or TEST activity occurred.
+- A focused offline Java 25 Maven run passed 9 decision, verified customer
+  mapping, tie, month-boundary, currency and uncertainty tests. This is partial
+  domain evidence only. Real Tebex completeness, gift attribution, persistent
+  shared decisions, publisher fencing and LuckPerms grants are not implemented
+  or tested; the code is not connected to the live runtime.
+
+
+## Focused offline evidence — 2026-11-01
+
+The coordinated bounded offline Maven run passed 25 tests with no failures,
+errors, or skips. It covers the closed-month policy, durable journal adapter
+with SQLite, mocked LuckPerms grant, strict Tebex parsing and existing
+pagination. Evidence: `operations/donor-network-verification-20261031/glorious-focused.log`
+(in the enclosing Chapter 2 workspace), Roundtable claim 3257 / release 3259.
+This is not proof of a complete Tebex snapshot, verified gift payer, MariaDB
+concurrency, running Paper/LuckPerms integration, or live award. Runtime wiring,
+auditable payer review, schema migration, and deployment remain unfinished.
+
+## Closed-month orchestration — 2026-11-01
+
+`MonthlyAwardCycle` holds unless activation permits the month, the caller has
+verified the complete scan, and the scan started at or after the calendar month
+ended and finished no later than the evaluation time. Unverified payers still
+hold the full monthly result before any journal or LuckPerms call. Four new
+focused tests plus the earlier suite passed: 29 total, no failures/errors/skips;
+see `operations/donor-network-verification-20261031/glorious-cycle-focused.log`
+and Roundtable claim 3267 / release 3268. This cycle is not yet wired to runtime;
+the caller must establish completeness and independently verified payer mappings.
+
+## Payer review journal — 2026-11-01
+
+A lease-fenced local JDBC adapter now records an immutable payment-hash review
+with month, payer UUID, reviewer UUID, evidence digest and database time.
+Repeated identical reviews are idempotent; mismatches and changes after the
+month has a decision fail. The API requires a future authenticated caller to
+validate the underlying payment, reviewer permission and payer identity. Schema
+is documentation only and has not been provisioned. A SQLite fixture covers
+these conditions; 30 focused offline tests passed (Roundtable 3279/3280), see
+`operations/donor-network-verification-20261031/glorious-review-focused.log`.
+No real MariaDB, operator command or runtime integration is proven.
+
+## Review-to-award integration — 2026-11-01
+
+`GloriousAwardService` ties the lease-fenced journal, payer reviews, monthly
+queue, decision and grant port together in an isolated adapter. The SQLite
+integration test verifies a gift is held until a reviewer attests the buyer,
+then awards the buyer once and does not grant again on replay. The full focused
+run passed 32 tests, no failures/errors/skips (Roundtable 3291/3292), evidence
+`operations/donor-network-verification-20261031/glorious-service-focused.log`.
+The service is not wired to a live scheduler or verified scan; a boolean input
+alone does not prove scan completeness. Reviewer authorization and evidence
+validation, MySQL/MariaDB concurrency, runtime tests, PR and deployment remain.
+
+## Restored Roundtable and scan evidence — 2026-11-01
+
+The existing local Roundtable database and HTTP service were recovered; health
+and configured identity were verified after the helper exited. No Minecraft
+server was restarted. The payment award service now requires immutable scan
+records created by the Tebex adapter after two matching strict scans, rather
+than accepting a caller-supplied completeness boolean. This is evidence of
+matching scans, not a transactional snapshot guarantee. Focused offline Maven
+passed 33 tests with no failures/errors/skips (Roundtable 3301/3302), evidence
+`operations/donor-network-verification-20261031/glorious-scan-focused.log`.
+The live publisher lifecycle, authenticated review interface, real MariaDB
+concurrency, actual LuckPerms acceptance, CI, review and PR remain unfinished.
+
+## Publisher-cycle and review guards — 2026-11-01
+
+Added an isolated publisher cycle that starts from the persisted activation
+month, evaluates closed months in order, prevents overlapping scans, stops on
+lease loss or unresolved awards, and permits a later tick after a scan failure.
+The shared publisher can create a service fenced to its boot token and lease
+epoch. Scan evidence is bound to the configured Tebex API key and timezone.
+Review submission now rejects a hash unless the same post-close scan identifies
+it as eligible in the requested month. Caller authorization and independent
+payer verification are still required; no command is wired to this primitive.
+The focused offline suite passed 37 tests, no failures/errors/skips, Roundtable
+3315/3316, log `operations/donor-network-verification-20261031/glorious-review-guard-focused.log`.
+These classes are not connected to Paper startup or live scheduling. Native
+MariaDB concurrency, real LuckPerms/Paper integration, authenticated operator
+workflow, complete verification, PR and activation remain open.
+
+## Opt-in Paper hook and full local verification — 2026-11-01
+
+The isolated source now connects the publisher cycle to successful official
+refreshes when `glorious.live-enabled` is true, the backend is the shared
+publisher and LuckPerms is available. Default is false. Added restricted payer
+review commands, eligible-month/payment checks, durable reviewer evidence hashes,
+and InnoDB schema instructions. Finalized months are reused during replay even
+if later payment history changes; ambiguous grants still hold.
+
+Full offline Maven test: 240 tests, zero failures/errors/skips; Roundtable
+3330/3331 and `operations/donor-network-verification-20261031/glorious-full-offline.log`.
+Static class-file comparison: all 20 referenced LuckPerms API method descriptors
+from compiled `LuckPermsGloriousGrant` and `TestRuntime` were present in the
+saved SMP `LuckPerms-Bukkit-5.5.85.jar`. This is not proof the saved JAR is
+currently running or that Paper startup, runtime saves, or permission delivery
+works. MariaDB concurrency, the real scan snapshot limitation, authorized review
+workflow, uncertain-grant recovery, independent review/CI and PR are open.
+No live schema, configuration, rank, server, or deployment was modified.
+
+## MariaDB concurrency and uncertain recovery — 2026-11-01
+
+A new disposable localhost MariaDB 11.8.3 fixture passed real InnoDB tests for
+concurrent conflicting payer attestations, a single concurrent award claim,
+uncertain state hold, stale publisher epoch, and the finalized-month review
+fence. A second fresh fixture also verified concurrent uncertain-recovery
+attestations permit exactly one audited confirmation. Both owned fixtures were
+stopped and their loopback listeners were gone; no existing server or live data
+was touched. Roundtable claims/releases: 3338/3339 and 3346/3347. Evidence:
+`operations/donor-network-verification-20261031/glorious-mariadb-fixture-20261101/fixture.log`
+and `operations/donor-network-verification-20261031/glorious-mariadb-recovery-fixture-20261101/fixture.log`.
+
+An authorized reviewer may attest that an UNCERTAIN winner already has durable
+permanent direct membership, recording reviewer UUID and evidence digest in an
+atomic transaction. This neither checks LuckPerms nor changes a rank; false
+attestations can falsely mark an award complete. GRANTING and absent memberships
+remain held. Full offline Maven passed 241 tests, zero failures/errors/skips,
+Roundtable 3340/3341, log `operations/donor-network-verification-20261031/glorious-recovery-full-offline.log`.
+Real Paper/LuckPerms operation, authenticated command behavior in Paper, exact
+production schema/version migration, Tebex buyer evidence and complete-snapshot
+limits, independent code review, CI, PR and activation remain unverified.
+
+## Glorious PR review remediation — 2026-11-01
+
+The isolated PR6 fix accepts audited confirmation of interrupted GRANTING as well
+as UNCERTAIN after independent verification of durable membership. Pre-write HELD
+returns to READY, while uncertain writes do not retry. Strict award scans reject
+missing, empty or malformed package metadata. The grant holds the publisher row
+lock and revalidates database lease ownership after the user load and before the
+save. Full offline Maven passed 251 tests, no failures, errors or skips (Roundtable
+3456/3457, `operations/donor-network-verification-20261031/glorious-review-fixes-offline.log`).
+This is not proof against connection loss during an external LuckPerms write;
+native MariaDB concurrency/fault injection, actual Tebex payload compatibility,
+Paper runtime and independent review remain open. No live servers were restarted.
+
+The subsequent disposable native MariaDB disconnect fixture (3470/3471) killed
+the locked connection at two explicit barriers and transferred lease ownership.
+The pre-check disconnect stopped the synthetic write; the post-check disconnect
+allowed the write to finish after takeover while the journal transaction failed.
+This demonstrates the remaining race, not an atomic fix or real LuckPerms proof.
+Official Tebex documentation illustrates numeric package IDs, but real store
+payload completeness remains unverified. No production data was accessed.
+
+At PR6 base `0bb6176565cfa0213f68944f49a757286e96aa76`, a new unmerged local
+package passed 251 tests and a fresh isolated Paper 26.2 / saved LuckPerms 5.5.85
+fixture passed synthetic permanent grant, replay, rank preservation and audited
+recovery (3477/3478). The fixture-only JAR used standalone configuration and
+did not exercise a publisher, live payment, or the MariaDB disconnect scenario.
+The Paper fixture artifact SHA-256 was
+`3f06c735190a7c586a17a16c063f91b591614a81a4cedc7ed90d472bda6baaa5`.
+Evidence: `operations/donor-network-verification-20261031/glorious-paper-current-probe.log`
+and `work/enthusia-dev-tools/runs/20261101T183531Z-1b754a391d/server.log`.
+
+## Recovery, MariaDB and isolated Paper attempt — 2026-11-01
+
+The full offline package passed 242 tests, zero failures/errors/skips; local
+unmerged JAR SHA-256 `f0a98c6ed1cfd5d24a9da21ccdeb19003296e171cdafa22c283cdcd7b9a8a39c`.
+A separate test-only JAR with fixture config overrides had SHA-256
+`547b5eb9875f925a6384a9a86aca2083c36436b6f0c80e9953d20f7fdfac1c80`.
+In fresh localhost Paper the donor sandbox started and explicitly held Glorious
+when the shared publisher was not configured. The LuckPerms startup assertion
+FAILED: its required runtime dependencies were absent and the fixture's offline
+proxy refused downloads. The scenario was stopped after confirming that failure;
+only its owned processes were terminated, and its port no longer listened.
+This is not a passing Paper/LuckPerms integration test. Evidence:
+`work/enthusia-dev-tools/runs/20261101T170454Z-712ae3bed8/server.log` and
+`operations/donor-network-verification-20261031/glorious-final-local-package.log`.
+Roundtable package/fixture claim 3361, release 3363.
+
+The legacy runtime now rejects `glorious.live-enabled: true` instead of silently
+ignoring it. Remaining: a vetted LuckPerms fixture with its dependencies available,
+actual Paper permissions/grant testing, GRANTING recovery, manual review usability,
+source snapshot limitations, independent review, CI, PR and activation.
+
+## Activation boundary and isolated Paper proof — 2026-11-01
+
+The configured publisher now attempts to persist the activation boundary before
+starting either Tebex payment or exclusion lookups. An unsuccessful activation
+attempt is held and does not block the existing public refresh. The full offline
+suite passed 245 tests, zero failures/errors/skips, including a database-backed
+regression showing activation survives a failed Tebex fetch and later service
+creation (Roundtable 3407/3408; `operations/donor-network-verification-20261031/glorious-activation-db-full-offline.log`).
+
+Earlier isolated Paper 26.2 + saved LuckPerms 5.5.85 synthetic tests passed:
+LuckPerms loaded checksum-verified libraries; the Glorious adapter saved an
+isolated synthetic membership, returned already-present on replay, preserved
+existing permissions/primary group, and held on shutdown. SQLite audited
+recovery confirmation made no rank change. The fixture predates the activation
+sequencing change and does not prove publisher scheduling or live behavior.
+Evidence: `operations/donor-network-verification-20261031/GLORIOUS-PAPER-PROBE-20261101.md`.
+Real Tebex payer verification and complete-snapshot limits, Paper publisher
+integration, GRANTING investigation, CI, independent review, PR and production
+activation remain open. No existing server was restarted.
+
+## Pending-payment finalization guard — 2026-11-01
+
+A month with any Tebex payment still marked pending is held before a winner or
+no-winner decision can be journaled; otherwise a later settlement could change
+the winner. The conservative hold also applies to pending payments that might
+later be excluded. Once all such payments reach terminal status, the usual
+source, currency and independently verified-payer checks still apply. The
+full offline Maven suite passed 246 tests, zero failures/errors/skips, including
+pending-month no-decision and outside-month regressions (Roundtable 3419/3420;
+`operations/donor-network-verification-20261031/glorious-pending-full-offline.log`).
+The public `/donors glorious` response now reports availability rather than
+claiming the implementation is disconnected when the publisher is active.
+Prior native Paper/LuckPerms and MariaDB probes predate these final changes.

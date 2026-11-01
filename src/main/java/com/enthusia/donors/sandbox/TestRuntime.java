@@ -60,6 +60,19 @@ public final class TestRuntime implements CommandExecutor,TabCompleter,Listener,
         var notificationSettings=com.enthusia.donors.sandbox.official.notifications.NotificationSettings.load(plugin.getConfig(),officialConfig.network());
         if(notificationSettings.enabled() && officialConfig.get().tebexApiKey().isBlank())throw new IllegalArgumentException("Real payment notifications need the publisher Tebex API key.");
         officialDonors=new OfficialDonorReadService(plugin,officialConfig);
+        if(plugin.getConfig().getBoolean("glorious.live-enabled",false)) {
+            if(officialConfig.network().mode()!=com.enthusia.donors.network.NetworkSettings.Mode.PUBLISHER
+                    || !plugin.getServer().getPluginManager().isPluginEnabled("LuckPerms")) {
+                plugin.getLogger().warning("Glorious remains disabled: shared publisher and LuckPerms are required.");
+            } else {
+                var registration=plugin.getServer().getServicesManager().getRegistration(net.luckperms.api.LuckPerms.class);
+                if(registration==null)plugin.getLogger().warning("Glorious remains disabled: LuckPerms API is unavailable.");
+                else {
+                    var adapter=new com.enthusia.donors.infrastructure.glorious.LuckPermsGloriousGrant(registration.getProvider(),()->closed || !plugin.isEnabled());
+                    officialDonors.enableGlorious((player,validLease) -> com.enthusia.donors.glorious.AwardCoordinator.GrantResult.valueOf(adapter.grant(player,validLease).name()));
+                }
+            }
+        }
         relay=com.enthusia.donors.sandbox.relay.BackendRelay.create(plugin);
         skins=new SkinService(settings,plugin.getDataFolder().toPath().resolve("testing").resolve("skins").resolve("head-textures.properties"));menus=new Menus(this);
         paymentAnnouncements=com.enthusia.donors.sandbox.official.notifications.PaymentAnnouncements.create(plugin,officialConfig,skins);
@@ -71,7 +84,7 @@ public final class TestRuntime implements CommandExecutor,TabCompleter,Listener,
         plugin.getServer().getMessenger().registerOutgoingPluginChannel(plugin,ProxyChatBroadcast.CHANNEL);
         plugin.getServer().getPluginManager().registerEvents(menus,plugin);
         plugin.getServer().getPluginManager().registerEvents(this,plugin);
-        plugin.getLogger().warning("TEST BUILD: public donor displays read official Tebex payments; real announcements are opt-in. Sandbox previews are separate. R2 and LuckPerms writes remain disconnected.");
+        plugin.getLogger().warning("TEST BUILD: official displays, real announcements and Glorious awards have separate configuration. Sandbox previews remain isolated.");
         CompletableFuture.supplyAsync(() -> {
             try {return new SandboxEngine(new SandboxDatabase(plugin.getDataFolder().toPath().resolve("testing")),Instant.now(),settings.zone());}
             catch(Exception ex){throw new CompletionException(ex);}
@@ -130,6 +143,8 @@ public final class TestRuntime implements CommandExecutor,TabCompleter,Listener,
     public void help(CommandSender sender){
         for(String line:List.of("/donors | /donors monthly | /donors alltime | /donors profile <name>",
                 "/edonors headcheck <official donor name> | refresh | status | notifications",
+                "/edonors glorious pending <yyyy-mm> [page] | review <yyyy-mm> <payment-hash> <payer-uuid> <evidence-sha256> confirm",
+                "/edonors glorious status <yyyy-mm> | confirm <yyyy-mm> <winner-uuid> <evidence-sha256> rank-verified",
                 "/edonors test menu | target <buyer> <recipient> | status",
                 "/edonors test purchase <player> <avid|devotee> [amount]",
                 "/edonors test gift <buyer> <recipient> <avid|devotee> [amount]",
@@ -152,6 +167,7 @@ public final class TestRuntime implements CommandExecutor,TabCompleter,Listener,
                 case "reload" -> {TestSettings next=TestSettings.load(plugin);settings=next;skins.settings(next);if(!next.networkBroadcasts())sessions.values().forEach(s -> s.networkAudience=false);if(!next.serverBroadcasts())sessions.values().forEach(s -> s.serverAudience=false);reply(sender,"testing.yml reloaded. Restart for official Tebex config.yml changes so the source cache stays isolated. The persisted sandbox timezone remains "+view().zone()+" until a new sandbox database is created.");}
                 case "status" -> status(sender);
                 case "notifications" -> reply(sender,"Real donation announcements: "+(paymentAnnouncements==null?"DISABLED":paymentAnnouncements.status()));
+                case "glorious" -> gloriousReviewCommand(sender,args);
                 case "refresh" -> {officialDonors.refresh();reply(sender,"Official donor refresh requested; readers poll shared data and publishers need the active lease. Check status after completion.");}
                 case "headcheck" -> {
                     if(args.length<2)throw new IllegalArgumentException("Usage: /edonors headcheck <official donor name>");
@@ -168,13 +184,50 @@ public final class TestRuntime implements CommandExecutor,TabCompleter,Listener,
         }catch(Exception ex){Throwable r=root(ex);reply(sender,"Not completed: "+(r.getMessage()==null?r.getClass().getSimpleName():r.getMessage()));}
         return true;
     }
+    private void gloriousReviewCommand(CommandSender sender,String[] args) {
+        if(!sender.hasPermission("enthusiadonors.glorious.review"))throw new IllegalArgumentException("You do not have access to Glorious reviews.");
+        if(args.length<3)throw new IllegalArgumentException("Use glorious pending <yyyy-mm> [page] or glorious review <yyyy-mm> <payment-hash> <payer-uuid> <evidence-sha256> confirm.");
+        YearMonth month=YearMonth.parse(args[2]);
+        if(args[1].equalsIgnoreCase("status")) {
+            if(args.length!=3)throw new IllegalArgumentException("Use glorious status <yyyy-mm>.");
+            watch(sender,officialDonors.gloriousStatus(month),decision->reply(sender,decision.map(d->"Glorious "+month+": "+d.state()+"; winner UUID: "+(d.winner()==null?"none":d.winner())).orElse("No Glorious decision recorded for "+month+".")));return;
+        }
+        if(args[1].equalsIgnoreCase("pending")) {
+            if(args.length>4)throw new IllegalArgumentException("Use glorious pending <yyyy-mm> [page].");
+            int page=args.length==4?Integer.parseInt(args[3]):1;if(page<1)throw new IllegalArgumentException("Page must be positive.");
+            watch(sender,officialDonors.gloriousPending(month),pending->{
+                var entries=pending.stream().sorted().toList();int pages=Math.max(1,(entries.size()+4)/5);
+                if(page>pages){reply(sender,"Review page is out of range; total pages: "+pages);return;}
+                reply(sender,"Glorious "+month+" pending payer verification: "+entries.size()+" (page "+page+"/"+pages+")");
+                entries.stream().skip((long)(page-1)*5).limit(5).forEach(hash->reply(sender,hash));
+            });return;
+        }
+        if(args[1].equalsIgnoreCase("confirm")) {
+            if(args.length!=6 || !args[5].equalsIgnoreCase("rank-verified"))
+                throw new IllegalArgumentException("Use glorious confirm <yyyy-mm> <winner-uuid> <evidence-sha256> rank-verified after verifying permanent membership.");
+            UUID reviewer=gloriousReviewer(sender);UUID winner=UUID.fromString(args[3]);
+            watch(sender,officialDonors.gloriousConfirm(month,winner,reviewer,args[4]),ignored->reply(sender,"Uncertain award confirmed from your attestation; no rank was changed."));return;
+        }
+        if(!args[1].equalsIgnoreCase("review") || args.length!=7 || !args[6].equalsIgnoreCase("confirm"))
+            throw new IllegalArgumentException("Use glorious review <yyyy-mm> <payment-hash> <payer-uuid> <evidence-sha256> confirm.");
+        UUID reviewer=gloriousReviewer(sender);
+        UUID payer=UUID.fromString(args[4]);
+        watch(sender,officialDonors.gloriousReview(month,args[3],payer,reviewer,args[5]),ignored->reply(sender,"Payer review recorded. The publisher will recheck the month on its next refresh."));
+    }
+    private static UUID gloriousReviewer(CommandSender sender) {
+        if(sender instanceof Player p)return p.getUniqueId();
+        if(sender instanceof ConsoleCommandSender)return new UUID(0L,0L);
+        throw new IllegalArgumentException("Only a player or console may submit a review.");
+    }
     private void publicCommand(CommandSender sender,String[] args){
         if(!sender.hasPermission("enthusiadonors.view")){reply(sender,"You do not have permission to view donor profiles.");return;}
         if(!(sender instanceof Player p)){reply(sender,"Use /enthusiadonors top monthly from console.");return;}
         String sub=args.length==0?"monthly":args[0].toLowerCase(Locale.ROOT);
         switch(sub){
             case "monthly" -> menus.officialLeaderboard(p,true,0);case "alltime" -> menus.officialLeaderboard(p,false,0);
-            case "me" -> menus.officialProfile(p,p.getUniqueId());case "directory" -> menus.officialDirectory(p,0);case "glorious" -> reply(p,"Glorious test awards are in /edonors test menu; official monthly awards are not connected yet.");
+            case "me" -> menus.officialProfile(p,p.getUniqueId());case "directory" -> menus.officialDirectory(p,0);case "glorious" -> reply(p,officialDonors.gloriousAvailable()
+                    ?"The monthly top donor can earn Glorious with qualifying donations. Winners may require review."
+                    :"Glorious awards are not available right now.");
             case "profile" -> {
                 if(args.length<2){menus.officialProfile(p,p.getUniqueId());return;}
                 UUID id=null;try{id=UUID.fromString(args[1]);}catch(IllegalArgumentException ignored){ }

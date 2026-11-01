@@ -64,6 +64,20 @@ public final class SharedDonorSnapshots implements AutoCloseable {
     }
     public boolean ownsLease() {return ownsLease.get();}
     public long leaseEpoch() {return leaseEpoch;}
+    /** Create an award service bound to the current publisher boot and lease epoch. */
+    public com.enthusia.donors.infrastructure.glorious.GloriousAwardService startGlorious(
+            long expectedEpoch,ZoneId timezone,java.util.function.BiFunction<UUID,java.util.function.BooleanSupplier,com.enthusia.donors.glorious.AwardCoordinator.GrantResult> grant) throws Exception {
+        if(closed || settings.mode()!=NetworkSettings.Mode.PUBLISHER || !ownsLease.get()
+                || expectedEpoch<1 || leaseEpoch!=expectedEpoch)
+            throw new IllegalStateException("Active publisher lease required for Glorious awards");
+        var journal=new com.enthusia.donors.glorious.JdbcAwardJournal(() -> {
+            Properties properties=new Properties();properties.setProperty("user",settings.username());properties.setProperty("password",settings.password());
+            properties.setProperty("connectTimeout","5000");properties.setProperty("socketTimeout","5000");
+            return DriverManager.getConnection(settings.jdbcUrl(),properties);
+        },com.enthusia.donors.glorious.JdbcAwardJournal.Dialect.MARIADB,settings.sourceId());
+        return com.enthusia.donors.infrastructure.glorious.GloriousAwardService.start(journal,bootToken,expectedEpoch,timezone,
+                player -> journal.guardedGrant(bootToken,expectedEpoch,player,grant));
+    }
     public long revision() {return consumer.revision();}
     public SnapshotRead.Status readState() {return consumer.lastRead();}
     public CompletableFuture<Boolean> poll() {return CompletableFuture.supplyAsync(this::pollNow,worker);}

@@ -11,9 +11,10 @@ public enum RuntimeMode {
             default -> throw new IllegalArgumentException("runtime.mode must be legacy or donor-network");
         };
         if(mode==LEGACY && (config.getBoolean("notifications.enabled",false)
+                || config.getBoolean("glorious.live-enabled",false)
                 || !"standalone".equalsIgnoreCase(config.getString("network.mode","standalone"))
                 || config.getBoolean("relay.enabled",false)))
-            throw new IllegalArgumentException("Shared donor data and notifications require runtime.mode: donor-network");
+            throw new IllegalArgumentException("Shared donor data, notifications and Glorious awards require runtime.mode: donor-network");
         return mode;
     }
 }
