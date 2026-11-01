@@ -170,7 +170,8 @@ public final class JdbcAwardJournal {
         });
     }
 
-    /** Hold the publisher row lock across the external grant, preventing lease takeover. */
+    /** Hold the publisher row lock across the external grant while the database connection survives.
+     * A disconnected transaction cannot fence an already-started external LuckPerms write. */
     public AwardCoordinator.GrantResult guardedGrant(String token,long epoch,UUID player,
             java.util.function.BiFunction<UUID,java.util.function.BooleanSupplier,AwardCoordinator.GrantResult> grant) throws SQLException {
         return transaction(token,epoch,(connection,now) -> grant.apply(player,() -> {

@@ -28,9 +28,9 @@ donations meet the configurable `glorious.minimum-monthly-donation` (default
   never be reported as a confirmed award or blindly retried.
 - When an authorized reviewer independently verifies an uncertain award already
   has its permanent direct Glorious membership, the system may record the
-  reviewer and evidence digest and mark only that uncertain decision awarded.
+  reviewer and evidence digest and mark that interrupted or uncertain decision awarded.
   This confirmation shall never grant, remove, reset, or retry a membership.
-  An in-progress `GRANTING` decision and an absent rank remain on hold.
+  An absent rank remains on hold; no automatic retry follows an interrupted grant.
 - When a gifted purchase's payer cannot be verified, hold the award for review;
   the user selected this policy rather than counting an unverified recipient.
 - A payer review shall record the source, closed month, payment hash, verified
@@ -101,13 +101,26 @@ lease, missing schema, source failure or unavailable LuckPerms holds the work.
 `glorious.live-enabled` defaults to false. Before activation, provision and
 review the four InnoDB tables in `glorious-schema.sql`, verify backup and
 permissions, and perform separate Paper/LuckPerms and MariaDB concurrency tests.
-For an `UNCERTAIN` state, `/edonors glorious status <yyyy-mm>` shows the recorded
+For an `UNCERTAIN` or interrupted `GRANTING` state, `/edonors glorious status <yyyy-mm>` shows the recorded
 winner UUID. An authorized reviewer must independently verify that exact player
 already has permanent direct global Glorious membership in durable LuckPerms
 storage, retain evidence, and then use `/edonors glorious confirm <yyyy-mm>
 <winner-uuid> <evidence-sha256> rank-verified`. This is a human attestation; it
 does not inspect LuckPerms or change any rank. The confirmation and reviewer
 are recorded atomically with the decision. If membership is absent or the state
-is `GRANTING`, leave the decision held for investigation. No automatic retry is
+is ambiguous, leave the decision held for investigation. No automatic retry is
 performed after an uncertain permission save. Two matching scans detect some
 changes but cannot guarantee a transactionally consistent Tebex snapshot.
+
+## Database disconnect fault evidence — 2026-11-01
+
+A disposable MariaDB 11.8.3 fixture killed the lease transaction and allowed a
+new owner to take over. When the disconnect occurred before the final lease check,
+the synthetic external write was prevented. When it occurred immediately after
+that check, the synthetic write completed after takeover and the database
+transaction failed. The row lock therefore cannot fence an in-flight LuckPerms
+save after a connection loss. Treat this as an unresolved activation blocker;
+the test did not use a real LuckPerms instance or live data. Fixture source:
+`src/test/fixtures/MariaDbLeaseLossProbe.java`. The official Tebex example shows
+package entries with numeric IDs, but does not prove every real store payment has
+nonempty package metadata: https://docs.tebex.io/plugin/endpoints/payments.

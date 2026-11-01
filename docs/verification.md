@@ -271,6 +271,24 @@ This is not proof against connection loss during an external LuckPerms write;
 native MariaDB concurrency/fault injection, actual Tebex payload compatibility,
 Paper runtime and independent review remain open. No live servers were restarted.
 
+The subsequent disposable native MariaDB disconnect fixture (3470/3471) killed
+the locked connection at two explicit barriers and transferred lease ownership.
+The pre-check disconnect stopped the synthetic write; the post-check disconnect
+allowed the write to finish after takeover while the journal transaction failed.
+This demonstrates the remaining race, not an atomic fix or real LuckPerms proof.
+Official Tebex documentation illustrates numeric package IDs, but real store
+payload completeness remains unverified. No production data was accessed.
+
+At PR6 base `0bb6176565cfa0213f68944f49a757286e96aa76`, a new unmerged local
+package passed 251 tests and a fresh isolated Paper 26.2 / saved LuckPerms 5.5.85
+fixture passed synthetic permanent grant, replay, rank preservation and audited
+recovery (3477/3478). The fixture-only JAR used standalone configuration and
+did not exercise a publisher, live payment, or the MariaDB disconnect scenario.
+The Paper fixture artifact SHA-256 was
+`3f06c735190a7c586a17a16c063f91b591614a81a4cedc7ed90d472bda6baaa5`.
+Evidence: `operations/donor-network-verification-20261031/glorious-paper-current-probe.log`
+and `work/enthusia-dev-tools/runs/20261101T183531Z-1b754a391d/server.log`.
+
 ## Recovery, MariaDB and isolated Paper attempt — 2026-11-01
 
 The full offline package passed 242 tests, zero failures/errors/skips; local

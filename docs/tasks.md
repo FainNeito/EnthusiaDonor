@@ -4,6 +4,8 @@
 
 - [x] Address PR review: strict package metadata, safe pre-write retry, audited interrupted-grant confirmation, and lease revalidation with row lock around the grant. Full offline suite: 251/251.
 - [ ] Independently review and fault-test the lease fence against native MariaDB connection loss and simultaneous lease takeover; verify real Paper/LuckPerms and Tebex package payloads before activation. A database lock cannot make an external LuckPerms write atomic if the database connection fails during the write.
+- [x] Reproduce both sides of the disconnect race in disposable MariaDB 11.8.3: recheck before write holds, but a write already past the check may finish after takeover (Roundtable 3470/3471). Real LuckPerms behavior and a cross-system fencing design remain open.
+- [x] Run current PR6 code in disposable Paper 26.2 with saved LuckPerms 5.5.85: synthetic adapter grant, replay, rank preservation and audited recovery passed (3477/3478). This did not exercise the shared publisher or live Tebex data.
 - [x] Identify sandbox/live gap and authoritative current main.
 - [ ] Specify verified identities, official closed-month accounting, currency,
   idempotent shared finalization and safe optional LuckPerms grant lifecycle.
