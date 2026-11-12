@@ -25,7 +25,8 @@ class InboxStorage(unittest.TestCase):
 
     def run_sql(self, filename, *args):
         with closing(self.connect()) as db:
-            return db.execute((HERE / filename).read_text(), args).fetchall()
+            return db.execute((HERE / filename).read_text(),
+                              {str(i): value for i, value in enumerate(args, 1)}).fetchall()
 
     def enqueue(self, body=b'fixture', source='test-store'):
         key = hashlib.sha256(body).hexdigest()

@@ -97,3 +97,8 @@ credential isolation, collision failure, no mutation on monitoring, fresh/stale
 classification, safe output, inactivity and a real temporary HTTPS fixture with
 trust/hostname/redirect/size/deadline failures. CI repeats the local tests; it does
 not execute the probe against a live inbox. See draft PR #9 for exact-head results.
+
+CI log review also found deprecated Python sequence bindings for numbered SQL
+parameters in the local SQLite harness. Both harnesses now bind numeric keys
+explicitly, and CI treats DeprecationWarning as an error. This was an observed
+compatibility warning, not a claimed production failure.
