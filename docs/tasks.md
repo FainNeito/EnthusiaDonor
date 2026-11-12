@@ -1,5 +1,21 @@
 # EnthusiaDonor Tasks
 
+## Dedicated webhook route preparation — 2026-11-11
+
+- [x] Refresh canonical main and keep PR #8 separate; use an isolated branch.
+- [x] Prepare exact-route buffered NGINX template and loopback regression harness.
+- [x] Verify 22 route tests, including actual receiver HMAC validation, plus the
+  existing Java suite (230 passed, 1 optional MariaDB test skipped).
+- [x] Record deliberately unbuffered failing control, scope, deployment gates
+  and rollback plan in [route plan](../ops/donor-webhook/route-plan.md) and
+  [evidence](../ops/donor-webhook/route-evidence.md).
+- [ ] Review receiver hardening separately; repeat on exact merged release.
+- [ ] Verify supported Bloom same-namespace supervision, downstream transport,
+  origin restrictions, total upload bound, Linux and Java 21 behavior.
+- [ ] Obtain later explicit activation approval before DNS/ports/runtime changes.
+
+No production changes or restart were performed during this preparation.
+
 ## Real purchase incident — 2026-10-09
 
 - [x] Create approved dedicated database; keep restricted source address.

@@ -1,0 +1,65 @@
+# Preparation template, NOT an installed production configuration.
+# A renderer must replace the two loopback socket placeholders. See route-plan.md.
+worker_processes 1;
+pid nginx.pid;
+error_log logs/error.log crit;
+events { worker_connections 128; }
+http {
+    # No request URI, identity, address, signature, or body in access logs.
+    log_format donor_safe '$status $request_time $upstream_status';
+    access_log logs/access.log donor_safe;
+    server_tokens off;
+    client_header_timeout 3s;
+    client_body_timeout 3s; # INACTIVITY timeout, not a total upload deadline.
+    send_timeout 5s;
+    keepalive_timeout 0;
+    reset_timedout_connection on;
+    client_header_buffer_size 1k;
+    large_client_header_buffers 2 4k;
+    client_max_body_size 256k;
+    client_body_buffer_size 256k;
+    client_body_temp_path body-temp;
+    proxy_temp_path proxy-temp;
+    map $http_x_signature $signature_shape_ok {
+        default 0;
+        "~^[0-9a-fA-F]{64}$" 1;
+    }
+    # Global route budgets: never trust caller-supplied client-IP headers.
+    limit_conn_zone $server_name zone=donor_connections:1m;
+    limit_req_zone $server_name zone=donor_requests:1m rate=5r/s;
+    upstream donor_receiver {
+        server @UPSTREAM@ max_conns=2;
+    }
+    server {
+        listen @LISTEN@ default_server;
+        server_name donations.enthusia.info;
+        if ($host != donations.enthusia.info) { return 404; }
+        # Raw URI check rejects query strings, encoding, normalization and slashes.
+        if ($request_uri != /tebex) { return 404; }
+        location = /tebex {
+            if ($request_method != POST) { return 405; }
+            if ($signature_shape_ok = 0) { return 403; }
+            limit_conn donor_connections 8;
+            limit_conn_status 429;
+            limit_req zone=donor_requests burst=10 nodelay;
+            limit_req_status 429;
+            proxy_request_buffering on;
+            proxy_buffering on;
+            proxy_http_version 1.1;
+            proxy_pass_request_headers off;
+            proxy_set_header Host localhost;
+            proxy_set_header Connection close;
+            proxy_set_header Content-Type application/json;
+            proxy_set_header X-Signature $http_x_signature;
+            proxy_connect_timeout 1s;
+            proxy_send_timeout 3s;
+            proxy_read_timeout 20s;
+            proxy_next_upstream off;
+            proxy_cache off;
+            proxy_pass http://donor_receiver;
+            error_page 502 504 =503 @unavailable;
+        }
+        location @unavailable { return 503; }
+        location / { return 404; }
+    }
+}

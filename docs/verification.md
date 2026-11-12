@@ -130,3 +130,14 @@ Live Paper, PlaceholderAPI, hologram, and Tebex comparisons remain pending. This
 - Staged on Velocity 25319956: plugins/chapter 2 staging/EnthusiaDonors-VelocityRelay-1.1.0-test.15.jar and EnthusiaDonors-test15-activation.md. A proxy staging folder was created; existing active JAR/configuration were not replaced.
 - Screenshots: ../artifacts/donor-test15-staging/backend.jpg and proxy.jpg. These prove remote file presence, not active plugin loading or client/Discord delivery. No restart, reload, test/real notification, commit, push, PR or production database provisioning occurred.
 - Remaining acceptance: shared MariaDB schema/credentials and matching source/signing configuration, later approved plugin activation, baseline sync, subsequent actual payment shown across two backends and smp-chatter, live outage/shutdown recovery. Current official polling interval is 10 minutes; it can be reduced to 1 minute. Official Glorious finalization/permission grants are still separate work.
+
+## Dedicated route preparation — 2026-11-11
+
+The isolated NGINX fixture passed 22 transport/actual-receiver tests against main
+`b9edd9b78f5ef3cd011b81f377e1bc450e066e8e`. The deliberately unbuffered control
+failed with `Incomplete body reached upstream`. Maven test-compile and the
+existing suite passed: 231 run, 230 passed, 1 optional MariaDB case skipped.
+These are Windows/JDK 25 local results, not production or Linux acceptance.
+See [route evidence](../ops/donor-webhook/route-evidence.md) and
+[route plan](../ops/donor-webhook/route-plan.md). PR #8 remains separate. No
+production restart, configuration change, DNS update or endpoint activation.
