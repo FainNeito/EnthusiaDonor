@@ -26,10 +26,15 @@ public final class TebexInboxConsumer implements AutoCloseable {
     private volatile boolean closed;
     private volatile String status="DISABLED";
     private int failures;
+    private final java.util.function.LongSupplier clock;
+    private static final long STATUS_INTERVAL = TimeUnit.MINUTES.toNanos(30);
+    private boolean statusCached, cachedAttention;
+    private long lastStatus;
     public TebexInboxConsumer(URI origin,String token,TebexWebhookEndpoint endpoint) {
         this(new HttpTransport(origin,token), (body,signature)->endpoint.handle(body,signature,Instant.now()));
     }
-    TebexInboxConsumer(Transport transport,Processor processor) {this.transport=transport;this.processor=processor;}
+    TebexInboxConsumer(Transport transport,Processor processor) {this(transport,processor,System::nanoTime);}
+    TebexInboxConsumer(Transport transport,Processor processor,java.util.function.LongSupplier clock) {this.transport=transport;this.processor=processor;this.clock=clock;}
     public void start() {
         if(!closed && started.compareAndSet(false,true))try {scheduler.execute(this::tick);}
         catch(RejectedExecutionException stopped) { /* concurrent shutdown */ }
@@ -47,11 +52,17 @@ public final class TebexInboxConsumer implements AutoCloseable {
             if(reply.status()==204) {
                 // No claimable event does not mean healthy: quarantine and an
                 // exhausted backlog require attention without automatic replay.
+                long now=clock.getAsLong();
+                if(statusCached && now-lastStatus >= 0 && now-lastStatus < STATUS_INTERVAL) {
+                    status=cachedAttention?"ATTENTION":"EMPTY";return true;
+                }
+                statusCached=false;
                 Reply health=transport.post("/consumer/status","{}");
                 if(health.status()!=200 || health.body().length()>4096)throw new IllegalStateException();
                 var attention=JsonParser.parseString(health.body()).getAsJsonObject().get("attention");
                 if(attention==null || !attention.isJsonPrimitive() || !attention.getAsJsonPrimitive().isBoolean())throw new IllegalStateException();
-                status=attention.getAsBoolean()?"ATTENTION":"EMPTY";return true;
+                cachedAttention=attention.getAsBoolean();lastStatus=clock.getAsLong();statusCached=true;
+                status=cachedAttention?"ATTENTION":"EMPTY";return true;
             }
             if(reply.status()!=200 || reply.body().length()>350000)throw new IllegalStateException();
             JsonObject claim=JsonParser.parseString(reply.body()).getAsJsonObject();

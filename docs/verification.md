@@ -172,3 +172,10 @@ acceptance. [Routing evidence](../ops/donor-webhook/pull-inbox/alert-routing.md)
 records five red assertions and eight passing routing tests; full local Node
 suite 35/35. Shared read quota is a deployment gate. Provider/owners/destination
 remain unassigned; no sends, production activation or restart. PR #9 stays draft.
+
+## Inbox quota tuning — 2026-11-12
+
+See [quota measurement and limits](../ops/donor-webhook/pull-inbox/quota-review.md).
+A new cache-cadence assertion failed before implementation and passes afterward;
+status can be up to 30 minutes old. Local D1 measures show backlog/admission
+scans still require further tuning and hosted quota verification. No deployment.

@@ -33,6 +33,24 @@ class TebexInboxConsumerTest {
             }
         }
     }
+    @Test void idleStatusIsBoundedAndFailedRefreshNeverLooksHealthy() {
+        var clock=new java.util.concurrent.atomic.AtomicLong(0);
+        var calls=new ArrayList<String>();
+        var failStatus=new java.util.concurrent.atomic.AtomicBoolean(false);
+        try(var c=new TebexInboxConsumer((path,body)->{
+            calls.add(path);
+            return path.endsWith("claim") ? new TebexInboxConsumer.Reply(204,"") :
+                new TebexInboxConsumer.Reply(failStatus.get()?503:200,"{\"attention\":true}");
+        },(body,signature)->{fail("unexpected event");return null;},clock::get)) {
+            assertTrue(c.pollOnce()); assertEquals("ATTENTION",c.status());
+            clock.set(java.util.concurrent.TimeUnit.MINUTES.toNanos(29));
+            assertTrue(c.pollOnce()); assertEquals("ATTENTION",c.status());
+            assertEquals(1,calls.stream().filter(x->x.endsWith("status")).count());
+            failStatus.set(true);clock.set(java.util.concurrent.TimeUnit.MINUTES.toNanos(30));
+            assertFalse(c.pollOnce());assertEquals("RETRY",c.status());
+            assertFalse(c.pollOnce());assertEquals("RETRY",c.status());
+        }
+    }
     private static String claim() throws Exception {
         byte[] body="synthetic".getBytes(StandardCharsets.UTF_8);
         JsonObject json=new JsonObject();

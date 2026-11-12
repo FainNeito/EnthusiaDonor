@@ -90,7 +90,7 @@ against synthetic local databases; no real recovery or deletion was performed.
 POST `/consumer/status` accepts only `{}` and the existing separate consumer bearer
 token. It returns aggregate counts/age/usage and an `attention` flag: at least 80%
 of either capacity, any quarantine/exhausted event, or unprocessed age >= 1 hour.
-No bodies, signatures or IDs are returned. The plugin queries status when a claim
+No bodies, signatures or IDs are returned. The plugin queries status at most once per 30 minutes while idle when a claim
 returns 204 and displays INBOX_ATTENTION instead of INBOX_EMPTY when needed. Failed
 or malformed status responses produce INBOX_RETRY, never a false healthy state.
 This is a pull-based status signal, not an external alert service or notification.
@@ -105,7 +105,7 @@ quarantine and its columns are insufficient: do not point this Worker at a v1
 database or treat CREATE TABLE as a migration. Any pre-existing populated v1 inbox
 would need a separate data-preserving migration and verification plan. Keep
 consumer and Worker versions paired; an older Worker without `/consumer/status`
-will make the new consumer report RETRY on idle claims.
+will make the new consumer report RETRY when the next status refresh is due.
 
 ## Evidence and review
 

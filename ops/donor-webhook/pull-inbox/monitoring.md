@@ -79,8 +79,10 @@ adapter. External storage/access/deletion behavior must be verified before use.
 Status currently aggregates the bounded table. At the 10,000-row cap, five-minute
 external polling means 288 checks/day, potentially about 2.88 million scanned rows
 per day before other queries. This is a planning estimate, not measured D1 billing.
-The existing consumer also queries status on every idle claim (roughly 5–7 seconds)
-and can dominate scan cost. Measure/tune this before hosting; do not assume the
+The consumer now caches a successful idle status for up to 30 minutes, with
+attention retained and failed refresh reported as RETRY. This can delay local
+attention visibility by up to 30 minutes; the proposed independent five-minute
+monitor remains inactive. Measure/tune this before hosting; do not assume the
 logical storage cap or this monitor's cadence guarantees an account quota budget.
 Physical storage and Time Travel remain separate from the reported payload bytes.
 
@@ -107,3 +109,5 @@ compatibility warning, not a claimed production failure.
 
 Account-specific plan, sampled backup window and destination findings are recorded
 in [account validation](account-validation.md). No hosted acceptance is claimed.
+
+Local D1 quota measurements and remaining blockers: [quota review](quota-review.md).
