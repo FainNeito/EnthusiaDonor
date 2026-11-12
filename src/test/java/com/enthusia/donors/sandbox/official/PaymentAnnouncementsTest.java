@@ -110,6 +110,51 @@ class PaymentAnnouncementsTest {
         var lines=PaymentMessages.chat(p,new int[64],settings);assertEquals(11,lines.size());
         assertFalse(lines.toString().contains("TEST"));assertTrue(lines.toString().contains("/donors profile"));
     }
+    @Test void packageNamesAndConfiguredStoreAppearInBothMessages() {
+        var base=payment("named",now,"complete");
+        var p=new PaymentRecord(base.paymentIdHash(),base.playerUuid(),base.playerName(),base.amount(),base.currency(),base.status(),base.createdAt(),false,false,base.packageIds(),now,List.of("Avid", "Devotee_*"));
+        var settings=new NotificationSettings(true,true,true,"","https://example.com/store",false,false);
+        var content=com.google.gson.JsonParser.parseString(PaymentMessages.discord(p,settings)).getAsJsonObject().get("content").getAsString();
+        assertTrue(content.contains("Avid")); assertTrue(content.contains("Devotee\\_\\*"));
+        assertTrue(content.contains("https://example.com/store"));
+        assertTrue(PaymentMessages.chat(p,new int[64],settings).toString().contains("Avid"));
+        assertFalse(content.contains("renewed")); assertFalse(content.contains("gifted"));
+    }
+    @Test void missingStoreUrlUsesEnthusiaStoreAndExplicitUrlStillOverridesIt() {
+        var c=new org.bukkit.configuration.file.YamlConfiguration();
+        var network=com.enthusia.donors.network.NetworkSettings.load(c);
+        assertEquals("https://store.enthusia.info",NotificationSettings.load(c,network).storeUrl());
+        c.set("notifications.store-url","https://example.com/store");
+        assertEquals("https://example.com/store",NotificationSettings.load(c,network).storeUrl());
+    }
+    @Test void confirmedRenewalUsesRenewalLanguageAndRetainsStoreLink() {
+        var base=payment("renewal",now,"complete");
+        var p=new PaymentRecord(base.paymentIdHash(),base.playerUuid(),base.playerName(),base.amount(),base.currency(),base.status(),base.createdAt(),false,false,base.packageIds(),now,List.of("Devotee"));
+        var settings=new NotificationSettings(true,true,true,"","https://store.enthusia.info",false,false);
+        var content=com.google.gson.JsonParser.parseString(PaymentMessages.discord(p,settings,true)).getAsJsonObject().get("content").getAsString();
+        assertTrue(content.contains("renewed a subscription"));assertTrue(content.contains("Renewal: Devotee"));
+        assertTrue(content.contains("https://store.enthusia.info"));assertFalse(content.contains("gifted"));
+        assertTrue(PaymentMessages.chat(p,new int[64],settings,true).toString().contains("renewed a subscription"));
+    }
+    @Test void gameBroadcastShowsProductAndShortSingleRowDividers() {
+        var base=payment("layout",now,"complete");
+        var p=new PaymentRecord(base.paymentIdHash(),base.playerUuid(),base.playerName(),base.amount(),base.currency(),base.status(),base.createdAt(),false,false,base.packageIds(),now,List.of("Avid"));
+        var settings=new NotificationSettings(true,true,true,"","https://store.enthusia.info",false,false);
+        var lines=PaymentMessages.chat(p,new int[64],settings);
+        var plain=net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText();
+        assertEquals("────────────────────",plain.serialize(lines.getFirst()));
+        assertEquals(plain.serialize(lines.getFirst()),plain.serialize(lines.getLast()));
+        assertTrue(lines.stream().map(plain::serialize).anyMatch(line->line.contains("Purchase: Avid")));
+        assertTrue(lines.stream().map(net.kyori.adventure.text.serializer.gson.GsonComponentSerializer.gson()::serialize).anyMatch(line->line.contains("open_url")));
+    }
+    @Test void longProductNameIsAbbreviatedWithFullNameOnHover() {
+        var base=payment("long",now,"complete");String name="A very long donor package name for this test";
+        var p=new PaymentRecord(base.paymentIdHash(),base.playerUuid(),base.playerName(),base.amount(),base.currency(),base.status(),base.createdAt(),false,false,base.packageIds(),now,List.of(name));
+        var settings=new NotificationSettings(true,true,true,"","https://store.enthusia.info",false,false);
+        var product=PaymentMessages.chat(p,new int[64],settings).get(5);
+        String plain=net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(product);
+        assertTrue(plain.contains("…"));assertTrue(net.kyori.adventure.text.serializer.gson.GsonComponentSerializer.gson().serialize(product).contains(name));
+    }
     void realJobs() throws Exception {
         arm();var p=payment("new",now.plusSeconds(1),"complete");
         var event=com.enthusia.donors.relay.RelayEvent.sign("store","payment-new","backend",now.plusSeconds(2),900,List.of("{}"),"a".repeat(32));

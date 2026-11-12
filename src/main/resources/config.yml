@@ -14,7 +14,13 @@ notifications:
   initialize-schema: false # Provision notify tables, or enable once with publisher schema privileges
   chat-enabled: true
   show-amounts: false
-  store-url: ''
+  store-url: 'https://store.enthusia.info' # Public store link in donation announcements
+  # Experimental: enable only after MariaDB and webhook end-to-end acceptance.
+  tebex-webhook:
+    enabled: false
+    port: 0 # Loopback-only, set an explicit port and configure a trusted HTTPS reverse proxy.
+    secret: '' # Private Tebex webhook signing secret; never commit a real secret.
+    wait-seconds: 120 # Enrichment window; late webhook events cannot change sent messages.
   discord:
     enabled: true
     channel-label: smp-chatter # Documentation only; the webhook determines the actual channel

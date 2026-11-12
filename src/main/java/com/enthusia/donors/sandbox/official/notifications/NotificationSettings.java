@@ -9,7 +9,8 @@ public record NotificationSettings(boolean enabled,boolean chat,boolean discord,
     public static NotificationSettings load(FileConfiguration c,NetworkSettings network) {
         boolean enabled=c.getBoolean("notifications.enabled",false),chat=c.getBoolean("notifications.chat-enabled",true),discord=c.getBoolean("notifications.discord.enabled",true);
         String webhook=c.getString("notifications.discord.webhook-url",""),store=c.getString("notifications.store-url","");
-        if(!store.isBlank())TestSettings.requireHttps(store,false);
+        if(store.isBlank())store="https://store.enthusia.info";
+        TestSettings.requireHttps(store,false);
         if(!webhook.isBlank())TestSettings.requireHttps(webhook,true);
         if(enabled) {
             if(network.mode()!=NetworkSettings.Mode.PUBLISHER)throw new IllegalArgumentException("Real payment notifications require network.mode=publisher; disable on readers.");

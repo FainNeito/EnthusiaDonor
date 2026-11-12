@@ -136,3 +136,10 @@ Requirements:
 - Do not flatten the gradients to a single color.
 - Do not include the testing marker as part of the rank text.
 - Keep the rank strings configurable in the bulk-update config rather than hard-coding them.
+
+## Donation announcement details (2026-11-10)
+
+- [ ] Validate package name parsing and announcement rendering with real Tebex-compatible fixtures.
+- [ ] Identify an authoritative event source for gift buyer/recipient and renewal status; implement only after verified payload and deduplication behavior.
+- [ ] Verify the actual configured store URL and end-to-end live delivery in a separately authorized activation.
+- [ ] Verify the updated in-game donor message, divider wrapping, package hover, clickable store link and responsive interactive preview on actual supported clients; current HTML preview is local only.
