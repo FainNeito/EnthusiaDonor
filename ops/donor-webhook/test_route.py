@@ -180,6 +180,13 @@ class Transport(Route):
         self.assertEqual(404, self.request(host="other.invalid")[0])
         self.assertTrue(self.spy.received.empty())
 
+    def test_missing_host_http10_rejected(self):
+        # $host alone falls back to server_name when the Host header is absent.
+        headers = f"POST /tebex HTTP/1.0\r\nX-Signature: {SIGNATURE}\r\nContent-Length: 2\r\n\r\n"
+        with self.raw(headers, b"{}") as sock:
+            self.assertIn(b" 404 ", sock.recv(4096))
+        self.assertFalse(self.upstream_connected())
+
     def test_missing_malformed_duplicate_signature_rejected_before_body(self):
         self.assertEqual(403, self.request(signature=None)[0])
         self.assertEqual(403, self.request(signature="bad")[0])
@@ -315,11 +322,14 @@ if __name__ == "__main__":
     parser.add_argument("--work", type=Path, required=True)
     parser.add_argument("--receiver-port", type=int)
     parser.add_argument("--negative-control", action="store_true")
+    parser.add_argument("--case", help="Run one Transport test by method name")
     OPTIONS = parser.parse_args()
     OPTIONS.nginx = OPTIONS.nginx.resolve()
     OPTIONS.work.mkdir(parents=True, exist_ok=True)
     suite = unittest.TestSuite()
-    if OPTIONS.negative_control:
+    if OPTIONS.case:
+        suite.addTest(Transport(OPTIONS.case))
+    elif OPTIONS.negative_control:
         suite.addTest(Transport("test_fixed_body_buffered_before_upstream"))
     else:
         suite.addTests(unittest.defaultTestLoader.loadTestsFromTestCase(Transport))

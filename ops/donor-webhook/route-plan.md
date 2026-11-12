@@ -82,6 +82,7 @@ harness renders it, and only for localhost. Production rendering remains manual
 and gated by the topology checks above.
 
 - One worker, 128 connection slots (including upstream connections), no keepalive.
+- Host header is mandatory, including HTTP/1.0; normalized hostname must match.
 - Header timeout 3 seconds; initial 1 KiB and two 4 KiB large header buffers.
 - Body size 262144 bytes, full request buffering, 3-second **idle** body timeout.
 - At most 8 requests after full headers; global 5 requests/second plus burst 10.
@@ -127,6 +128,13 @@ The Java launcher uses the actual compiled `TebexHttpReceiver` and
 validation can succeed; signed payments must fail closed without invoking a
 database, official API, Discord or player announcements. Existing Java tests
 separately cover the synthetic outbox/replay paths.
+
+The `Donor route isolation` workflow repeats this harness on Linux with Java 21
+and 25, using a source-archive-digest-pinned NGINX build in the runner's temporary
+directory. It also requires the buffering control to fail for the specific
+expected assertion, so a startup/dependency failure cannot count as a passing
+control. Inspect exact-head results; merely adding the workflow is not evidence
+that its tests passed. See the follow-up in `route-evidence.md`.
 
 Each test starts and stops its own NGINX instance under a unique prefix; it never
 uses a system NGINX service or a blanket process kill. Temporary test data remains

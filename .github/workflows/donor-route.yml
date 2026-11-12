@@ -1,0 +1,77 @@
+name: Donor route isolation
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  route:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        java: ['21', '25']
+    steps:
+      - name: Checkout exact pull-request head
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Set up Java
+        uses: actions/setup-java@3a4f6e1af504cf6a31855fa899c6aa5355ba6c12
+        with:
+          distribution: temurin
+          java-version: ${{ matrix.java }}
+          cache: maven
+      - name: Build isolated NGINX binary from pinned source
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends build-essential libpcre2-dev zlib1g-dev
+          mkdir -p "$RUNNER_TEMP/donor-nginx"
+          cd "$RUNNER_TEMP/donor-nginx"
+          curl --fail --location --retry 3 --output nginx.tar.gz https://nginx.org/download/nginx-1.31.8.tar.gz
+          echo '0652b760b3b772d2ec17b47c2fc15d9a95e6fe35cd5b877eadc1a62d9bc75af1  nginx.tar.gz' | sha256sum --check
+          tar -xzf nginx.tar.gz
+          cd nginx-1.31.8
+          ./configure --prefix="$RUNNER_TEMP/donor-nginx/install"
+          make -j2
+          make install
+          echo "DONOR_NGINX=$RUNNER_TEMP/donor-nginx/install/sbin/nginx" >> "$GITHUB_ENV"
+      - name: Compile actual receiver
+        run: mvn --batch-mode --no-transfer-progress test-compile
+      - name: Verify buffering negative control
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p target/route-evidence
+          set +e
+          python3 ops/donor-webhook/test_route.py --nginx "$DONOR_NGINX" --work target/route-fixtures --negative-control > target/route-evidence/negative.log 2>&1
+          result=$?
+          set -e
+          cat target/route-evidence/negative.log
+          test "$result" -eq 1
+          grep -Fq 'AssertionError: True is not false : Incomplete body reached upstream' target/route-evidence/negative.log
+          grep -Fxq 'FAILED (failures=1)' target/route-evidence/negative.log
+      - name: Test route against actual receiver
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$DONOR_NGINX" -V 2> target/route-evidence/nginx-version.log
+          java -version 2> target/route-evidence/java-version.log
+          python3 ops/donor-webhook/run_fixture.py --nginx "$DONOR_NGINX" --gson "$HOME/.m2/repository/com/google/code/gson/gson/2.11.0/gson-2.11.0.jar" 2>&1 | tee target/route-evidence/route.log
+      - name: Upload isolated test evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: donor-route-java-${{ matrix.java }}
+          path: |
+            target/route-evidence/
+            target/route-fixtures/receiver-stderr.log
+          if-no-files-found: warn
+          retention-days: 14

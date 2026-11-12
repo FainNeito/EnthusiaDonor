@@ -55,3 +55,28 @@ network-wide chat or Discord acceptance. See `route-plan.md` for release gates.
 
 Production state: no restart, reload, port allocation, DNS write, live config
 change, webhook registration, payment event, notification or artifact upload.
+
+## PR #9 follow-up — 2026-11-12
+
+The original head `6835dcfd4b55396a9ef5f17ef93f26661e8c3520` passed both
+Sentinel artifact jobs (Java 21 and 25), run `43159737130`. Those jobs compile
+and test the plugins; they did not execute the NGINX route harness. GitHub had
+no submitted reviews or inline review threads. CodeRabbit reported that it
+skipped draft-PR review; no independent approval is inferred from that notice.
+
+Self-review found that NGINX `$host` falls back to `server_name` when an HTTP/1.0
+request omits Host. The new `test_missing_host_http10_rejected` regression was
+run before changing the template and failed: expected 404, observed 200. The
+template now rejects an empty `$http_host` before checking the normalized host.
+The transcript is `route-host-red.log`; the subsequent full-suite transcript
+is `route-host-green.log` in the local task workspace: 23 passed, zero failures
+or errors, 32.918 seconds on Windows/JDK 25.
+
+The new `Donor route isolation` CI workflow builds NGINX 1.31.8 from a pinned
+source archive in a temporary runner directory, then runs the deliberately
+unbuffered control and full route/actual-receiver suite on Linux with Java 21
+and 25. It installs build dependencies only, not a system NGINX service. The
+archive SHA-256 is
+`0652b760b3b772d2ec17b47c2fc15d9a95e6fe35cd5b877eadc1a62d9bc75af1`.
+This digest was measured from the vendor HTTPS download; it is not independent
+PGP verification. Exact-head results must be checked after the workflow runs.
