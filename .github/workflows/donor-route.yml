@@ -45,6 +45,8 @@ jobs:
           echo "DONOR_NGINX=$RUNNER_TEMP/donor-nginx/install/sbin/nginx" >> "$GITHUB_ENV"
       - name: Compile actual receiver
         run: mvn --batch-mode --no-transfer-progress test-compile
+      - name: Test outbound inbox SQL protocol (SQLite, not hosted D1)
+        run: python3 ops/donor-webhook/pull-inbox/test_storage.py
       - name: Verify buffering negative control
         shell: bash
         run: |

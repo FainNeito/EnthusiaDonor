@@ -1,5 +1,12 @@
 # Dedicated donor webhook route — preparation only
 
+**2026-11-12 alternative:** the user requested a path without Bloom support.
+The recommended next design is the [outbound inbox](outbound-inbox-plan.md):
+Cloudflare receives/stores events and the plugin pulls them over HTTPS. Its
+storage protocol has an isolated SQL prototype; Worker/poller implementation
+is pending. The NGINX design below remains reference evidence, not a requirement
+for that alternative. No production design has been activated.
+
 Prepared 2026-11-11 (America/New_York). No production changes are authorized by
 this file. No DNS, Bloom allocation, server startup, plugin configuration,
 Tebex webhook registration, or notification dispatch was changed in this work.
