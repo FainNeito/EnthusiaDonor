@@ -108,3 +108,15 @@ The game broadcast divider is shortened from 40 to 20 box-drawing characters to 
 ### Review fixes before merge, 2026-11-11
 
 Review found two ordering gaps in the local prototype. A signed event whose official payment is still pending or has a future timestamp is now rejected for retry instead of being acknowledged without enqueuing. A confirmed refund or chargeback observed while its announcement is HELD now cancels those held channel jobs; it does not mutate a job already released or sent. Synthetic SQLite tests cover both paths, and the disposable MariaDB fixture includes the held-refund case. These safeguards do not settle unverified gift identity, release-window policy, or live callback acceptance.
+
+### Receiver header admission, 2026-11-11
+
+Requirement: the receiver shall reject missing, malformed or duplicate signature headers and declared bodies over 262144 bytes before waiting for the body. HMAC verification of the complete raw body remains mandatory; syntactically valid headers are not authentication.
+
+Implementation: header admission checks precede readNBytes. A raw-socket regression sends headers without any body and requires 403 or 413 within two seconds. The existing signed-validation and replay/end-to-end tests still pass. This is a local test change, not live acceptance. No historical failing run is claimed. Project-local EARS/state tooling was not found in this checkout.
+
+Remaining: valid-looking signatures can still occupy workers with slow bodies. Transport deadlines, bounded admission and an operational buffered HTTPS proxy remain activation gates. Gift recipient mapping still requires a controlled store event. No production configuration or server restart was performed.
+
+### Request-body deadline follow-up
+
+The loopback receiver now closes an incomplete body after five seconds using its own scheduler; it does not change JVM-wide HTTP settings. A raw-socket test stalls both workers, observes both connections close, then verifies another request succeeds. Fourteen receiver/evidence/end-to-end tests passed on local JDK 25. Header parsing occurs before the handler: a buffered HTTPS reverse proxy with header/body deadlines and admission limits is still required. This supersedes the earlier body-timeout limitation only; gift mapping and live activation remain unverified.
