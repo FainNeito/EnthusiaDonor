@@ -161,6 +161,7 @@ Requirements:
 - [x] Verify authenticated durable admission, lease/ACK behavior, TLS/response protections and outbox redelivery locally.
 - [x] Add atomic capacity, quarantine, completed-tombstone retention and authenticated attention status; verify recovery/preservation locally.
 - [x] Prepare a read-only external monitor, inactive integration proposal, backup-retention review and synthetic restore exercise.
+- [x] Inspect account plan/backup capability read-only and test inactive alert-routing decisions.
 - [ ] Assign/install the external monitor and verify alert routing; resolve account-specific backup/raw-data disposition and operator ownership; independently review the draft.
 - [ ] Verify hosted D1, actual outbound egress and end-to-end/failover acceptance under separate authorization.
 - Evidence and remaining gates: [outbound inbox](../ops/donor-webhook/outbound-inbox-plan.md).

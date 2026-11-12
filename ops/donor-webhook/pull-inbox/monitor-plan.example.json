@@ -1,5 +1,7 @@
 {
   "enabled": false,
+  "decision_module": "alert-routing.mjs",
+  "delivery_enabled": false,
   "provider": null,
   "primary_owner": null,
   "backup_owner": null,
@@ -12,6 +14,9 @@
   "missing_result_after_seconds": 900,
   "open_after_consecutive_results": { "WARNING": 3, "CRITICAL": 2, "UNKNOWN": 2 },
   "recover_after_consecutive_ok": 3,
+  "escalate_unresolved_after_seconds": 900,
+  "mixed_failure_policy": "consecutive non-OK results use the highest observed severity",
+  "max_observation_delivery_age_seconds": 120,
   "repeat_notification_seconds": 3600,
   "retain_sanitized_results_days": 14,
   "automatic_remediation": false

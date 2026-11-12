@@ -11,9 +11,10 @@ disconnected from the consumer until reconciled with the authoritative outbox.
 Cloudflare's plan-specific limits list **7 days Free / 30 days Workers Paid** for
 D1 Time Travel. Its general Time Travel page describes a 30-day recovery window,
 says it is always on, and says restoring does not remove older bookmarks. Use
-the plan-specific limit, not an assumed universal 30 days. No account plan,
-production database/version, backup inventory or actual retention was inspected
-or changed here: this project has not provisioned a hosted inbox.
+the plan-specific limit, not an assumed universal 30 days. Read-only account inspection subsequently confirmed Workers Free and a seven-day
+Time Travel window on an existing development database; see
+[account validation](account-validation.md). Donor-specific history and restore
+correctness remain unverified: this project has not provisioned a hosted inbox.
 [Plan-specific limits](https://developers.cloudflare.com/d1/platform/limits/),
 [Time Travel documentation](https://developers.cloudflare.com/d1/reference/time-travel/).
 
@@ -79,7 +80,7 @@ It checks expired-lease rejection and demonstrates that the original live fixtur
 remains unchanged. Temporary files are removed after the exercise. This proves
 the application-level hazard, not Cloudflare restore correctness or backup expiry.
 
-The documentation review and local exercise are complete. Account-specific plan,
+The documentation review and local exercise are complete. The account plan and sampled UI window are now verified; donor-specific
 actual history/exports, owner-approved indefinite raw-data disposition, contractual
 deletion requirements, hosted restore/duplicate/gap reconciliation, ownership and
 recovery objectives remain unverified gates. No legal-compliance or erasure

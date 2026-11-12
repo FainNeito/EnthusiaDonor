@@ -163,3 +163,12 @@ protections. [Backup review](../ops/donor-webhook/pull-inbox/backup-retention-re
 records plan-specific Time Travel documentation and a synthetic SQLite restore
 that resurrects previously ACKed/pruned data. No hosted monitor, backup, restore,
 notification, restart or activation occurred. PR #9 remains draft.
+
+## Account validation and dry-run alert routing — 2026-11-12
+
+[Account evidence](../ops/donor-webhook/pull-inbox/account-validation.md) confirms
+Workers Free and a sampled seven-day Time Travel window, not donor restore
+acceptance. [Routing evidence](../ops/donor-webhook/pull-inbox/alert-routing.md)
+records five red assertions and eight passing routing tests; full local Node
+suite 35/35. Shared read quota is a deployment gate. Provider/owners/destination
+remain unassigned; no sends, production activation or restart. PR #9 stays draft.

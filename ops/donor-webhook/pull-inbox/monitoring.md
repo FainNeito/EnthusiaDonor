@@ -52,9 +52,11 @@ checks, a ten-second supervisor kill deadline and an independent dead-man incide
 if no result arrives within 15 minutes. Treat CRITICAL/UNKNOWN as incidents after
 two consecutive results and WARNING after three. Recover after three OK results;
 deduplicate by inbox plus incident type, repeat at most hourly, and keep a separate
-record of acknowledgement/owner. This persistence/routing/dead-man behavior must
-be implemented and tested in the chosen provider; the one-shot script does not
-implement it. Do not make GitHub CI or a Cloudflare Cron the only observer.
+record of acknowledgement/owner. Pure routing decisions are now locally tested in
+[alert-routing.mjs](alert-routing.mjs); see [routing contract](alert-routing.md).
+Durable persistence, delivery and independent watchdog scheduling must still be
+implemented and tested in the chosen provider; the one-shot probe does not
+implement them. Do not make GitHub CI or a Cloudflare Cron the only observer.
 
 - UNKNOWN: check observer health/time/DNS/TLS, credential configuration and
   provider status. Never treat an error or absent check as OK.
@@ -102,3 +104,6 @@ CI log review also found deprecated Python sequence bindings for numbered SQL
 parameters in the local SQLite harness. Both harnesses now bind numeric keys
 explicitly, and CI treats DeprecationWarning as an error. This was an observed
 compatibility warning, not a claimed production failure.
+
+Account-specific plan, sampled backup window and destination findings are recorded
+in [account validation](account-validation.md). No hosted acceptance is claimed.
