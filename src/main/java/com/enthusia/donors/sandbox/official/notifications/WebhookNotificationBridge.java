@@ -38,6 +38,11 @@ public final class WebhookNotificationBridge {
         return lookup.byTransaction(evidence.transactionId()).thenApply(payment -> {
             if(payment==null || payment.paymentIdHash()==null || payment.paymentIdHash().isBlank())
                 throw new IllegalStateException("Official payment identity unavailable");
+            if(payment.createdAt()==null || payment.createdAt().isAfter(now))
+                throw new IllegalStateException("Official payment timestamp is not ready");
+            String status=payment.status()==null?"":payment.status().trim().toLowerCase(java.util.Locale.ROOT);
+            if(!java.util.Set.of("complete","completed","successful","success","paid","refund","refunded","chargeback").contains(status))
+                throw new IllegalStateException("Official payment status is not final");
             // Rendering may resolve a skin; never hold the shared source row lock while waiting.
             boolean allowed=eligible.test(payment);
             NotificationStore.Payload prepared=allowed?renderer.render(payment,evidence):null;

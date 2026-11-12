@@ -67,6 +67,17 @@ class DeferredNotificationStoreTest {
         assertEquals(1,names.size());
         assertEquals(0,store.releaseDeferred(BASE.plusSeconds(60),30));
     }
+    @Test void refundBeforeReleaseCancelsHeldAnnouncements(@TempDir Path dir) throws Exception {
+        var store=new NotificationStore(()->DriverManager.getConnection("jdbc:sqlite:"+dir.resolve("refund.db")),NotificationStore.Dialect.SQLITE,"fixture");
+        store.init();store.observe(List.of(),BASE,p->true,this::generic);var paid=payment();
+        store.observeDeferred(List.of(paid),BASE.plusSeconds(2),x->true,this::generic);
+        var refunded=new PaymentRecord(paid.paymentIdHash(),paid.playerUuid(),paid.playerName(),paid.amount(),paid.currency(),"refunded",paid.createdAt(),true,false,paid.packageIds(),paid.importedAt());
+        store.observeDeferred(List.of(refunded),BASE.plusSeconds(3),x->false,this::generic);
+        assertEquals(0,store.releaseDeferred(BASE.plusSeconds(32),30));assertTrue(store.pending().isEmpty());
+        assertTrue(store.status().contains("CANCELLED=2"));
+        store.observeDeferred(List.of(paid),BASE.plusSeconds(40),x->true,this::generic);
+        assertTrue(store.pending().isEmpty());
+    }
     @Test void mariadbDurableOrdering() throws Exception {
         String url=System.getenv("DONOR_FIXTURE_JDBC"); org.junit.jupiter.api.Assumptions.assumeTrue(url!=null && !url.isBlank());
         NotificationStore.Connections connections=()->DriverManager.getConnection(url,"root","");
@@ -93,5 +104,12 @@ class DeferredNotificationStoreTest {
         }
         var jobs=race.pending();assertEquals(2,jobs.size());
         assertEquals(1,jobs.stream().map(j->j.payload().substring(0,j.payload().indexOf('-'))).distinct().count());
+        var refunds=new NotificationStore(connections,NotificationStore.Dialect.MARIADB,"refund");
+        refunds.init();refunds.observe(List.of(),BASE,p->true,this::generic);var paid=payment();
+        refunds.observeDeferred(List.of(paid),BASE.plusSeconds(2),x->true,this::generic);
+        var refunded=new PaymentRecord(paid.paymentIdHash(),paid.playerUuid(),paid.playerName(),paid.amount(),paid.currency(),"refunded",paid.createdAt(),true,false,paid.packageIds(),paid.importedAt());
+        refunds.observeDeferred(List.of(refunded),BASE.plusSeconds(3),x->false,this::generic);
+        assertEquals(0,refunds.releaseDeferred(BASE.plusSeconds(32),30));assertTrue(refunds.pending().isEmpty());
+        assertTrue(refunds.status().contains("CANCELLED=2"));
     }
 }

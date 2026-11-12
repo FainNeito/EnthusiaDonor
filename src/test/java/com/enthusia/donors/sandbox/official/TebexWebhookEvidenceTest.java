@@ -154,4 +154,21 @@ class TebexWebhookEvidenceTest {
             assertEquals(2,store.pending().size());assertTrue(store.pending().stream().allMatch(j->j.payload().equals("RENEWAL")));
         }
     }
+    @Test void webhookRetriesUntilOfficialPaymentIsReady(@org.junit.jupiter.api.io.TempDir java.nio.file.Path dir) throws Exception {
+        var now=java.time.Instant.parse("2026-11-10T12:00:00Z");
+        var store=new com.enthusia.donors.sandbox.official.notifications.NotificationStore(()->java.sql.DriverManager.getConnection("jdbc:sqlite:"+dir.resolve("unready.db")),com.enthusia.donors.sandbox.official.notifications.NotificationStore.Dialect.SQLITE,"store");
+        store.init();store.observe(java.util.List.of(),now.minusSeconds(5),x->true,x->null);
+        var uuid=java.util.UUID.randomUUID();
+        var pending=new com.enthusia.donors.model.PaymentRecord("hash",uuid,"Donor",java.math.BigDecimal.TEN,"USD","pending",now.minusSeconds(1),false,false,java.util.List.of(1),now);
+        var future=new com.enthusia.donors.model.PaymentRecord("hash",uuid,"Donor",java.math.BigDecimal.TEN,"USD","complete",now.plusSeconds(1),false,false,java.util.List.of(1),now);
+        var state=new java.util.concurrent.atomic.AtomicReference<>(pending);
+        var bridge=new com.enthusia.donors.sandbox.official.notifications.WebhookNotificationBridge(store,tx->java.util.concurrent.CompletableFuture.completedFuture(state.get()),x->true,(x,e)->new com.enthusia.donors.sandbox.official.notifications.NotificationStore.Payload("chat","discord"),true);
+        var endpoint=new com.enthusia.donors.sandbox.official.notifications.TebexWebhookEndpoint(SECRET,bridge);byte[] event=body("payment.completed",PAYMENT);String signed=signature(event);
+        assertEquals(503,endpoint.handle(event,signed,now).toCompletableFuture().join().status());
+        state.set(future);assertEquals(503,endpoint.handle(event,signed,now).toCompletableFuture().join().status());
+        assertTrue(store.pending().isEmpty());
+        var ready=new com.enthusia.donors.model.PaymentRecord("hash",uuid,"Donor",java.math.BigDecimal.TEN,"USD","complete",now.minusSeconds(1),false,false,java.util.List.of(1),now);
+        state.set(ready);assertEquals(200,endpoint.handle(event,signed,now).toCompletableFuture().join().status());
+        assertEquals(2,store.releaseDeferred(now.plusSeconds(120),120));assertEquals(2,store.pending().size());
+    }
 }

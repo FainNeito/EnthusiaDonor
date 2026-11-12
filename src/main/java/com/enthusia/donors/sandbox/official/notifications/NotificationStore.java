@@ -63,19 +63,19 @@ public final class NotificationStore {
                 for(PaymentRecord payment:payments) {
                     if(payment.createdAt().isAfter(now))continue;
                     boolean known=observed.containsKey(payment.paymentIdHash()),terminal=Boolean.TRUE.equals(observed.get(payment.paymentIdHash()));
+                    String status=payment.status()==null?"":payment.status().trim().toLowerCase(Locale.ROOT);
+                    boolean completed=Set.of("complete","completed","successful","success","paid").contains(status);
+                    // Only a reversal status (or a completed record with its reversal flag) is terminal here.
+                    boolean reversed=Set.of("refund","refunded","chargeback").contains(status) || completed && payment.refundedOrChargeback();
                     if(terminal) {
-                        if(deferred && enrich && eligible.test(payment)) {
+                        if(reversed)cancelHeld(c,payment.paymentIdHash());
+                        else if(deferred && enrich && eligible.test(payment)) {
                             Payload improved=renderer.apply(payment);
                             replaceHeld(c,payment.paymentIdHash(),"chat",improved.chat());
                             replaceHeld(c,payment.paymentIdHash(),"discord",improved.discord());
                         }
                         continue;
                     }
-                    String status=payment.status()==null?"":payment.status().trim().toLowerCase(Locale.ROOT);
-                    boolean completed=Set.of("complete","completed","successful","success","paid").contains(status);
-                    // The legacy API parser also flags pending/failed statuses as invalid. Only a
-                    // reversal status (or a completed record with its reversal flag) is terminal here.
-                    boolean reversed=Set.of("refund","refunded","chargeback").contains(status) || completed && payment.refundedOrChargeback();
                     boolean old=payment.createdAt().toEpochMilli()<baseline;
                     boolean consume=first || old || completed || reversed;
                     if(!first && !old && completed && !reversed && eligible.test(payment)) {
@@ -113,6 +113,11 @@ public final class NotificationStore {
     }
     private void job(Connection c,PaymentRecord payment,String channel,String payload,long expiry,boolean deferred) throws SQLException {
         try(PreparedStatement p=c.prepareStatement("INSERT INTO enthusiadonors_notify_jobs(source_id,payment_hash,channel,payload,state,expires_at) VALUES (?,?,?,?,?,?)")) {p.setString(1,source);p.setString(2,payment.paymentIdHash());p.setString(3,channel);p.setString(4,payload);p.setString(5,deferred?"HELD":"PENDING");p.setLong(6,expiry);p.executeUpdate();}
+    }
+    private void cancelHeld(Connection c,String payment) throws SQLException {
+        try(PreparedStatement p=c.prepareStatement("UPDATE enthusiadonors_notify_jobs SET state='CANCELLED' WHERE source_id=? AND payment_hash=? AND state='HELD'")) {
+            p.setString(1,source);p.setString(2,payment);p.executeUpdate();
+        }
     }
     private void replaceHeld(Connection c,String payment,String channel,String payload) throws SQLException {
         if(payload==null)return;
