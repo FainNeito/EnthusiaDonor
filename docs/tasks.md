@@ -155,6 +155,16 @@ Requirements:
 
 ## Donation announcement details (2026-11-10)
 
+### Outbound webhook preparation (2026-11-12)
+
+- [x] Implement an inactive Worker/D1 inbox and opt-in Java HTTPS pull consumer without Bloom ingress/support.
+- [x] Verify authenticated durable admission, lease/ACK behavior, TLS/response protections and outbox redelivery locally.
+- [ ] Add capacity/quarantine/backlog/retention policies and independently review the draft.
+- [ ] Verify hosted D1, actual outbound egress and end-to-end/failover acceptance under separate authorization.
+- Evidence and remaining gates: [outbound inbox](../ops/donor-webhook/outbound-inbox-plan.md).
+
+### Existing announcement acceptance
+
 - [ ] Validate package name parsing and announcement rendering with real Tebex-compatible fixtures.
 - [ ] Identify an authoritative event source for gift buyer/recipient and renewal status; implement only after verified payload and deduplication behavior.
 - [ ] Verify the actual configured store URL and end-to-end live delivery in a separately authorized activation.

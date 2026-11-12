@@ -91,8 +91,10 @@ must be checked before provisioning; nothing was purchased or provisioned.
 The existing `TebexWebhookEndpoint.handle` accepts bytes/signature/time without
 requiring a socket, and `WebhookNotificationBridge` already writes through the
 shared outbox. These are viable integration points, but a new outbound adapter
-and its lifecycle/configuration tests are still required. Current startup wires
-the loopback receiver; this proposal does not change that wiring.
+and its lifecycle/configuration tests are now implemented as described below.
+Startup selects exactly one transport; both remain disabled by default. The pull
+consumer starts only after a successful official sync establishes the baseline
+and eligibility snapshot.
 
 The current 120-second enrichment window still applies. Offline/backlogged
 renewals may arrive after fallback messages are released; pulling does not solve
@@ -115,23 +117,69 @@ Run from repository root:
 python ops/donor-webhook/pull-inbox/test_storage.py
 ```
 
-This is a **SQL protocol experiment**, not a Worker, D1 binding test, deployed
-queue, authenticated gateway or wired plugin consumer. It uses only synthetic
-local data. Authentication, D1 serialization/concurrency, bounded body reads,
-cross-store credentials, hosted failure recovery, database capacity/retention,
-poller/outbox crash ordering and the full path still need implementation/testing.
+## Implemented preparation slice — 2026-11-12
 
-## Next implementation slice and activation boundary
+The Worker entry module now uses the same SQL through a D1 binding. It requires
+HTTPS, exact POST paths without queries, independently configured signing and
+consumer secrets, and a trusted SOURCE matching the publisher namespace. It
+checks the signature before parsing, accepts only the existing official lookup's
+transaction-reference format, and awaits a successful insert before payment ACK.
+Validation handshakes are authenticated but do not create inbox rows. Uploads
+have a 262144-byte limit and five-second total read deadline. Consumer requests
+are limited to 1024 bytes. No raw event or credential is logged by this code.
 
-Implement the Worker/D1 binding and private claim/ACK API in local workerd tests;
-then add the opt-in Java pull adapter against a fake HTTPS gateway and the existing
-durable outbox. Test lost responses, crash after commit, conflicting poll/webhook
-orders and publisher transitions before an explicitly authorized isolated hosted
-test. Keep PR #9 draft while this replaces the proposed production ingress design;
-retain the NGINX fixture as reference evidence, not an activation requirement for
-the outbound alternative.
+Claims use server-generated 256-bit tokens and 90-second leases. ACK requires the
+current unexpired token and clears the live payload. A lost ACK response is safe:
+if committed, the tombstone suppresses replay; otherwise the event is redelivered.
+A repeated ACK returns 409 and never consumes another owner's lease.
 
-No support dependency or new Bloom port is required, but this is not a zero-change
-activation. A later reviewed plugin release/configuration and approved lifecycle
-step are still necessary. No merge, server restart/reload, DNS update, Worker/D1
-creation, secret creation, Tebex registration or production activation occurred.
+The Java adapter uses ordinary verified HTTPS, no redirects, a five-second
+connect timeout, ten-second full response deadline, 350000-byte response cap,
+raw-body digest checks, and the existing signed endpoint. It waits up to thirty
+seconds for processing before sending ACK. Timeout/failure leaves the lease for
+redelivery; any processing still in flight remains covered by shared outbox
+deduplication. Pulls are serial, normally every five to seven seconds after each
+completed cycle; failures back off to at most sixty-two seconds. Closing stops
+scheduling and cancels owned HTTP work. No acknowledgement is scheduled after
+processing finishes on a closed consumer. Already transmitted requests cannot be
+recalled.
+
+Configuration under `notifications.tebex-webhook`:
+- `enabled` selects the existing loopback receiver (default false).
+- `pull-enabled` selects the outbound consumer (default false); both true is invalid.
+- `inbox-origin` is an HTTPS origin without credentials, path, query or fragment.
+- `consumer-token` is a separate 32–256 character URL-safe secret, never an account API key.
+- `secret` remains the Tebex signing secret; `wait-seconds` retains its existing meaning.
+- Pull mode needs no listening port and only starts following a successful publisher sync.
+
+Worker bindings are DB (dedicated D1), SOURCE, TEBEX_SECRET and CONSUMER_SECRET.
+Only local Miniflare bindings exist here. There is deliberately no deploy script,
+Wrangler deployment configuration, live resource identifier or stored secret.
+
+## Verification and remaining acceptance
+
+See [inbox implementation evidence](pull-inbox/evidence.md). Local Node tests
+cover authentication, signed validation, delayed/failed persistence, unsupported
+inputs, exact routes and read deadlines. Local workerd/D1 exercises 256 KiB BLOB
+serialization, duplicate ingestion, concurrent leases, expiry, stale ACK,
+payload clearing, replay tombstones and missing-table failure. SQLite's eight
+protocol tests are retained. Java tests cover commit-before-ACK, lost ACK followed
+by one durable outbox job, invalid envelopes, processing errors, shutdown, config
+exclusivity and a trusted local HTTPS gateway with certificate/hostname rejection,
+redirect refusal, response cap and stalled-body deadline. These are synthetic,
+isolated tests, not a hosted end-to-end deployment or independent approval.
+
+Before activation, still implement capacity/admission policy, quarantine and
+backlog alarms, payload/tombstone/backup retention, and operational credential
+rotation. There is no automatic expiry or deletion of unprocessed events; repeated
+failures remain pending. Storage errors produce 503, but this is not a complete
+quota/backlog management policy. Verify actual account quotas/billing, hosted D1
+behavior, Bloom outbound egress, publisher failover and full payment-to-delivery
+acceptance under a separately authorized isolated hosted plan. The existing
+late-enrichment and gift-identity limitations remain.
+
+PR #9 stays draft. The prior NGINX fixture is reference evidence, not a dependency
+of this outbound design. PR #8 remains separate. A later reviewed plugin release,
+configuration and authorized lifecycle step are still necessary. No merge, server
+restart/reload, DNS update, Worker/D1 creation, secret creation, Tebex registration,
+notification or production activation occurred.

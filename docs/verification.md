@@ -133,6 +133,12 @@ Live Paper, PlaceholderAPI, hologram, and Tebex comparisons remain pending. This
 
 ## Dedicated route preparation — 2026-11-11
 
+Update 2026-11-12: the default-off outbound Worker/D1 + plugin consumer is now
+implemented and tested locally. See [inbox evidence](../ops/donor-webhook/pull-inbox/evidence.md)
+for behavioral red/green evidence, local workerd/D1 and HTTPS checks, full Java
+suite results and unresolved operational/hosted gates. The following route
+results describe the earlier NGINX reference path, not the outbound alternative.
+
 The isolated NGINX fixture passed 22 transport/actual-receiver tests against main
 `b9edd9b78f5ef3cd011b81f377e1bc450e066e8e`. The deliberately unbuffered control
 failed with `Incomplete body reached upstream`. Maven test-compile and the

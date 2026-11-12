@@ -7,13 +7,17 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.function.Predicate;
 
-/** Explicit opt-in assembly; no listener is registered or started by plugin startup. */
+/** Shared durable processing for either explicitly selected transport. */
 public final class TebexWebhookAssembly {
     private TebexWebhookAssembly() { }
     public static TebexHttpReceiver loopback(InetSocketAddress address, String secret,
             NotificationStore store, TebexClient client, DonorsConfig config,
             Predicate<PaymentRecord> eligible, WebhookNotificationBridge.Renderer renderer) throws IOException {
+        return new TebexHttpReceiver(address,endpoint(secret,store,client,config,eligible,renderer));
+    }
+    public static TebexWebhookEndpoint endpoint(String secret,NotificationStore store,TebexClient client,DonorsConfig config,
+            Predicate<PaymentRecord> eligible,WebhookNotificationBridge.Renderer renderer) {
         var bridge=new WebhookNotificationBridge(store,transaction->client.fetchWebhookPayment(config,transaction),eligible,renderer,true);
-        return new TebexHttpReceiver(address,new TebexWebhookEndpoint(secret,bridge));
+        return new TebexWebhookEndpoint(secret,bridge);
     }
 }
