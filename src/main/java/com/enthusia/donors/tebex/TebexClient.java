@@ -33,9 +33,16 @@ public final class TebexClient {
     private static final URI PAYMENTS_URI = URI.create("https://plugin.tebex.io/payments");
 
     private final Logger logger;
+    private final URI paymentsUri;
 
     public TebexClient(Logger logger) {
-        this.logger = logger;
+        this.logger = logger; this.paymentsUri=PAYMENTS_URI;
+    }
+    /** Isolated tests may use a loopback fixture; production always uses the fixed Tebex HTTPS endpoint. */
+    TebexClient(Logger logger, URI fixtureUri) {
+        if(fixtureUri==null || !"http".equals(fixtureUri.getScheme()) || !"127.0.0.1".equals(fixtureUri.getHost()))
+            throw new IllegalArgumentException("Only a loopback HTTP test fixture is permitted");
+        this.logger=logger;this.paymentsUri=fixtureUri;
     }
 
     public CompletableFuture<List<PaymentRecord>> fetchPayments(DonorsConfig config) {
@@ -61,9 +68,46 @@ public final class TebexClient {
                 .collect(Collectors.toUnmodifiableSet()));
     }
 
+    /** Resolve a verified webhook transaction reference to the exact identity used by the polling outbox.
+     * This only looks up identity; it does not enqueue or dispatch an announcement.
+     */
+    public CompletableFuture<String> resolveWebhookPaymentIdHash(DonorsConfig config, String transactionId) {
+        if (transactionId == null || !transactionId.matches("tbx-[A-Za-z0-9-]{1,128}"))
+            return CompletableFuture.failedFuture(new TebexException("Invalid Tebex transaction reference"));
+        HttpClient client = HttpClient.newBuilder()
+                .connectTimeout(java.time.Duration.ofSeconds(config.timeoutSeconds())).build();
+        return fetchPaymentIdHash(client, config, transactionId);
+    }
+
+    /** Fetch the authoritative plugin payment for an authenticated webhook transaction. */
+    public CompletableFuture<PaymentRecord> fetchWebhookPayment(DonorsConfig config, String transactionId) {
+        if (transactionId == null || !transactionId.matches("tbx-[A-Za-z0-9-]{1,128}"))
+            return CompletableFuture.failedFuture(new TebexException("Invalid Tebex transaction reference"));
+        URI uri=URI.create(paymentsUri+"/"+URLEncoder.encode(transactionId,StandardCharsets.UTF_8));
+        HttpRequest request=HttpRequest.newBuilder(uri).timeout(java.time.Duration.ofSeconds(config.timeoutSeconds()))
+                .header("Accept","application/json").header("User-Agent","EnthusiaDonors/1.0")
+                .header("X-Tebex-Secret",config.tebexApiKey()).GET().build();
+        return HttpClient.newBuilder().connectTimeout(java.time.Duration.ofSeconds(config.timeoutSeconds())).build()
+                .sendAsync(request,HttpResponse.BodyHandlers.ofString()).thenApply(response -> {
+                    if(response.statusCode()<200 || response.statusCode()>=300)
+                        throw new TebexException("Tebex payment lookup failed; HTTP "+response.statusCode());
+                    try {return parsePayment(JsonParser.parseString(response.body()).getAsJsonObject(),Instant.now())
+                            .orElseThrow(()->new TebexException("Tebex payment identity unavailable"));}
+                    catch(TebexException failure) {throw failure;}
+                    catch(Exception invalid) {throw new TebexException("Invalid Tebex payment response");}
+                });
+    }
+
+    String resolvedPaymentIdHash(JsonObject payment) {
+        return stringValue(payment, "id").map(id -> {
+            try { return hashId(id); }
+            catch (Exception ex) { throw new IllegalStateException("Unable to hash resolved Tebex payment ID", ex); }
+        }).orElseThrow(() -> new TebexException("A resolved Tebex payment had no payment ID"));
+    }
+
     private CompletableFuture<String> fetchPaymentIdHash(HttpClient client, DonorsConfig config, String transactionId) {
         String encoded = URLEncoder.encode(transactionId, StandardCharsets.UTF_8);
-        URI uri = URI.create(PAYMENTS_URI + "/" + encoded);
+        URI uri = URI.create(paymentsUri + "/" + encoded);
         HttpRequest request = HttpRequest.newBuilder(uri)
                 .timeout(java.time.Duration.ofSeconds(config.timeoutSeconds()))
                 .header("Accept", "application/json")
@@ -78,13 +122,7 @@ public final class TebexClient {
                         throw new TebexException("Could not resolve one configured excluded Tebex transaction; HTTP " + response.statusCode());
                     }
                     JsonObject payment = JsonParser.parseString(response.body()).getAsJsonObject();
-                    return stringValue(payment, "id").map(id -> {
-                        try {
-                            return hashId(id);
-                        } catch (Exception ex) {
-                            throw new IllegalStateException("Unable to hash resolved Tebex payment ID", ex);
-                        }
-                    }).orElseThrow(() -> new TebexException("A configured excluded Tebex transaction had no payment ID"));
+                    return resolvedPaymentIdHash(payment);
                 });
     }
 
@@ -99,7 +137,7 @@ public final class TebexClient {
                     "Tebex history exceeds max-pages=" + config.maxPages() + "; refusing an incomplete leaderboard"));
         }
 
-        URI uri = URI.create(PAYMENTS_URI + "?paged=1&page=" + URLEncoder.encode(String.valueOf(page), StandardCharsets.UTF_8));
+        URI uri = URI.create(paymentsUri + "?paged=1&page=" + URLEncoder.encode(String.valueOf(page), StandardCharsets.UTF_8));
         HttpRequest request = HttpRequest.newBuilder(uri)
                 .timeout(java.time.Duration.ofSeconds(config.timeoutSeconds()))
                 .header("Accept", "application/json")
@@ -196,8 +234,19 @@ public final class TebexClient {
                 invalidStatus,
                 isManualPayment(object),
                 packageIds(object),
-                importedAt
+                importedAt,
+                packageNames(object)
         ));
+    }
+
+    private List<String> packageNames(JsonObject object) {
+        if (!object.has("packages") || !object.get("packages").isJsonArray()) return List.of();
+        List<String> names = new ArrayList<>();
+        for (JsonElement element : object.getAsJsonArray("packages")) {
+            if (element.isJsonObject()) stringValue(element.getAsJsonObject(), "name")
+                    .map(String::strip).filter(name -> !name.isEmpty()).ifPresent(names::add);
+        }
+        return List.copyOf(names);
     }
 
     private List<Integer> packageIds(JsonObject object) {

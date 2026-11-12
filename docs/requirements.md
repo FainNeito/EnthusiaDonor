@@ -50,3 +50,11 @@ The test.6 JAR shows raw `%enthusiadonors_*%` tokens on donor and kill/death hol
 The shared data contract is in [network-data.md](network-data.md). The signed Velocity announcement/outbox contract and delivery uncertainty policy are in [proxy-relay.md](proxy-relay.md). Both are opt-in test features; real Tebex event ingestion and payment-transaction announcements remain separate ledger work.
 
 Unit tests prove value mapping, source separation, and empty/privacy behavior. A clean Maven build and JAR inspection prove compilation and packaging. A live Paper server with a configured Tebex key, PlaceholderAPI, and the hologram plugin is still needed to prove the official totals and player-visible replacement.
+
+## Donation announcement details (2026-11-10)
+
+- When an official payment includes package names, the announcement shall display those names without enabling Discord mentions.
+- When the store URL is configured, the announcement shall retain the clickable store link.
+- When gift or renewal identity is not established by authoritative payment data, the announcement shall not assert that identity.
+- When an in-game donation announcement has package names, it shall show the purchase or renewal package text and retain full abbreviated text on hover.
+- When rendering the in-game announcement dividers, the plugin shall use a shorter divider to reduce wrapping on typical chat widths; client-specific wrapping remains an acceptance check.
