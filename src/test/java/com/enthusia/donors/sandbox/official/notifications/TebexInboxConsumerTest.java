@@ -10,6 +10,29 @@ import java.util.concurrent.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 class TebexInboxConsumerTest {
+    @Test void emptyClaimChecksForQuarantineOrBacklogAttention() {
+        for(boolean attention:List.of(false,true)) {
+            var paths=new ArrayList<String>();
+            try(var consumer=new TebexInboxConsumer((path,body)->{
+                paths.add(path);
+                return path.endsWith("claim")?new TebexInboxConsumer.Reply(204,""):
+                    new TebexInboxConsumer.Reply(200,"{\"attention\":"+attention+"}");
+            },(body,signature)->{fail("No event was claimed");return null;})) {
+                assertTrue(consumer.pollOnce());
+                assertEquals(List.of("/consumer/claim","/consumer/status"),paths);
+                assertEquals(attention?"ATTENTION":"EMPTY",consumer.status());
+            }
+        }
+    }
+    @Test void unavailableOrMalformedStatusNeverReportsEmptyAndHealthy() {
+        for(var reply:List.of(new TebexInboxConsumer.Reply(503,""),new TebexInboxConsumer.Reply(200,"{}"),
+                new TebexInboxConsumer.Reply(200,"{\"attention\":\"false\"}"))) {
+            try(var consumer=new TebexInboxConsumer((path,body)->path.endsWith("claim")?new TebexInboxConsumer.Reply(204,""):reply,
+                    (body,signature)->{fail("No event was claimed");return null;})) {
+                assertFalse(consumer.pollOnce());assertEquals("RETRY",consumer.status());
+            }
+        }
+    }
     private static String claim() throws Exception {
         byte[] body="synthetic".getBytes(StandardCharsets.UTF_8);
         JsonObject json=new JsonObject();

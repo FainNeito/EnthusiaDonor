@@ -159,7 +159,8 @@ Requirements:
 
 - [x] Implement an inactive Worker/D1 inbox and opt-in Java HTTPS pull consumer without Bloom ingress/support.
 - [x] Verify authenticated durable admission, lease/ACK behavior, TLS/response protections and outbox redelivery locally.
-- [ ] Add capacity/quarantine/backlog/retention policies and independently review the draft.
+- [x] Add atomic capacity, quarantine, completed-tombstone retention and authenticated attention status; verify recovery/preservation locally.
+- [ ] Establish external monitoring, backup/raw-data disposition and operator ownership; independently review the draft.
 - [ ] Verify hosted D1, actual outbound egress and end-to-end/failover acceptance under separate authorization.
 - Evidence and remaining gates: [outbound inbox](../ops/donor-webhook/outbound-inbox-plan.md).
 

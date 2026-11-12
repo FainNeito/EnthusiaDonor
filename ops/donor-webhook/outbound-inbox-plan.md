@@ -76,10 +76,10 @@ must be checked before provisioning; nothing was purchased or provisioned.
    but before ACK causes redelivery, which the outbox must deduplicate. Never
    directly announce from the inbox consumer. Transient failures must not ACK.
 6. Separate quarantine/inspection behavior is required for repeatedly failing
-   authenticated events. Add retry backoff, capacity limits, backlog alarms and
-   a retention policy; do not silently expire unprocessed events. On quota failure
-   stop accepting new events successfully. The prototype does not yet implement
-   these operational policies.
+   authenticated events. Retry backoff, atomic capacity limits, quarantine,
+   completed-tombstone retention and aggregate attention status are now implemented
+   in the [inbox policy](pull-inbox/policy.md). Unprocessed events never expire
+   automatically. External alerting and hosted capacity sizing remain open.
 7. ACK removes raw body/signature from the live row and retains a digest tombstone.
    Configure retention for tombstones and backups separately: clearing live
    columns does not erase historical backups. Use a dedicated private database,
@@ -117,7 +117,7 @@ Run from repository root:
 python ops/donor-webhook/pull-inbox/test_storage.py
 ```
 
-## Implemented preparation slice — 2026-11-12
+## Implemented preparation slice â€” 2026-11-12
 
 The Worker entry module now uses the same SQL through a D1 binding. It requires
 HTTPS, exact POST paths without queries, independently configured signing and
@@ -148,7 +148,7 @@ Configuration under `notifications.tebex-webhook`:
 - `enabled` selects the existing loopback receiver (default false).
 - `pull-enabled` selects the outbound consumer (default false); both true is invalid.
 - `inbox-origin` is an HTTPS origin without credentials, path, query or fragment.
-- `consumer-token` is a separate 32–256 character URL-safe secret, never an account API key.
+- `consumer-token` is a separate 32â€“256 character URL-safe secret, never an account API key.
 - `secret` remains the Tebex signing secret; `wait-seconds` retains its existing meaning.
 - Pull mode needs no listening port and only starts following a successful publisher sync.
 
@@ -169,11 +169,13 @@ exclusivity and a trusted local HTTPS gateway with certificate/hostname rejectio
 redirect refusal, response cap and stalled-body deadline. These are synthetic,
 isolated tests, not a hosted end-to-end deployment or independent approval.
 
-Before activation, still implement capacity/admission policy, quarantine and
-backlog alarms, payload/tombstone/backup retention, and operational credential
-rotation. There is no automatic expiry or deletion of unprocessed events; repeated
-failures remain pending. Storage errors produce 503, but this is not a complete
-quota/backlog management policy. Verify actual account quotas/billing, hosted D1
+The [capacity, quarantine and retention policy](pull-inbox/policy.md) now sets
+atomic admission bounds, isolates exhausted expired leases, prunes old completed
+tombstones, and exposes authenticated attention status to the consumer. Pending
+and quarantined payloads are preserved without automatic expiry. Before
+activation, validate account capacity/cost, establish external alerting and
+operator ownership, review backup/raw-data retention, and implement operational
+credential rotation. Verify actual account quotas/billing, hosted D1
 behavior, Bloom outbound egress, publisher failover and full payment-to-delivery
 acceptance under a separately authorized isolated hosted plan. The existing
 late-enrichment and gift-identity limitations remain.

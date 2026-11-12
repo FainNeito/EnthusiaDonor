@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createHash, createHmac } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { createWorker, boundedBody } from './worker.mjs';
-const worker = createWorker(Object.fromEntries(['enqueue', 'claim', 'ack'].map(name => [name, readFileSync(new URL(name + '.sql', import.meta.url), 'utf8')])));
+const worker = createWorker(Object.fromEntries(['enqueue', 'claim', 'ack', 'quarantine', 'prune', 'status'].map(name => [name, readFileSync(new URL(name + '.sql', import.meta.url), 'utf8')])));
 
 const secret = 'synthetic-tebex-secret-at-least-32-bytes';
 const token = 'synthetic-consumer-secret-at-least-32-bytes';
@@ -14,7 +14,8 @@ function request(body = payment, path = '/tebex', headers = {}) {
   return new Request('https://inbox.example' + path, { method: 'POST', body,
     headers: { 'x-signature': signature(body), ...headers } });
 }
-function database(run) { return { prepare() { return { bind(...args) { return { run: () => run(args), first: () => run(args) }; } }; } }; }
+function database(run) { return { batch: async () => [{ success: true }, { success: true }],
+  prepare() { return { bind(...args) { return { run: () => run(args), first: () => run(args) }; } }; } }; }
 
 test('reject unsigned before reading or touching storage', async () => {
   const r = request(); r.headers.delete('x-signature');
@@ -39,10 +40,10 @@ test('do not acknowledge before durable insert resolves; retain exact bytes', { 
   const DB = database(args => { assert.equal(args[0], 'fixture'); assert.deepEqual(new Uint8Array(args[2]), new TextEncoder().encode(payment)); called(); return committed; });
   const pending = worker.fetch(request(), { ...env, DB }).then(r => { settled = true; return r; });
   await entered; await new Promise(resolve => setImmediate(resolve)); assert.equal(settled, false);
-  commit({ success: true }); assert.equal((await pending).status, 200);
+  commit({ success: true, results: [{ id: 'fixture' }] }); assert.equal((await pending).status, 200);
 });
 test('storage errors and unsuccessful results never acknowledge payment', async () => {
-  for (const run of [() => { throw Error('private failure'); }, () => ({ success: false })]) {
+  for (const run of [() => { throw Error('private failure'); }, () => ({ success: false }), () => ({ success: true, results: [] })]) {
     const r = await worker.fetch(request(), { ...env, DB: database(run) });
     assert.equal(r.status, 503); assert.equal((await r.text()).includes('private'), false);
   }
@@ -75,7 +76,19 @@ test('total read deadline cancels stalled and trickling uploads', async () => {
 });
 test('renewals use the official transaction reference; bad configuration fails closed', async () => {
   const body = JSON.stringify({ type: 'recurring-payment.renewed', subject: { last_payment: { transaction_id: 'tbx-renewal' } } });
-  assert.equal((await worker.fetch(request(body), { ...env, DB: database(() => ({ success: true })) })).status, 200);
+  assert.equal((await worker.fetch(request(body), { ...env, DB: database(() => ({ success: true, results: [{ id: 'fixture' }] })) })).status, 200);
   assert.equal((await worker.fetch(request(body.replace('tbx-renewal', 'invalid')), env)).status, 400);
   assert.equal((await worker.fetch(request(), { ...env, CONSUMER_SECRET: secret })).status, 503);
+});
+test('invalid policies fail closed and maintenance failures cannot acknowledge ingestion', async () => {
+  for (const [key, value] of [['INBOX_MAX_ROWS', '10001'], ['INBOX_MAX_BYTES', '262143'],
+    ['INBOX_MAX_ATTEMPTS', '0'], ['INBOX_TOMBSTONE_DAYS', '6'], ['INBOX_TOMBSTONE_DAYS', '366'],
+    ['INBOX_MAX_ROWS', 'NaN'], ['INBOX_MAX_ROWS', '1.5'], ['INBOX_MAX_ROWS', '']])
+    assert.equal((await worker.fetch(request(), { ...env, [key]: value })).status, 503);
+  for (const batch of [async () => { throw Error('private error'); }, async () => [{ success: false }]]) {
+    const DB = { ...database(() => assert.fail('Insertion must not run')), batch };
+    const r = await worker.fetch(request(), { ...env, DB });
+    assert.equal(r.status, 503); assert.equal(r.headers.get('retry-after'), '60');
+    await assert.rejects(worker.scheduled({}, { ...env, DB }), /Inbox maintenance failed/);
+  }
 });

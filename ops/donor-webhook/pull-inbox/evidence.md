@@ -1,5 +1,9 @@
 # Outbound inbox preparation evidence — 2026-11-12
 
+This records the initial implementation at `dd4974a`. The subsequent
+[policy slice](policy.md) adds tested capacity, quarantine, retention and status
+behavior; its counts and remaining gates supersede the corresponding items below.
+
 ## Spec and implementation
 
 [Requirements, design, activation boundary](../outbound-inbox-plan.md).

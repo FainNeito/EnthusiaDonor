@@ -29,11 +29,11 @@ class InboxStorage(unittest.TestCase):
 
     def enqueue(self, body=b'fixture', source='test-store'):
         key = hashlib.sha256(body).hexdigest()
-        self.run_sql('enqueue.sql', source, key, body, '0' * 64)
+        self.run_sql('enqueue.sql', source, key, body, '0' * 64, 10000, 67108864)
         return key
 
     def claim(self, token='lease-a', source='test-store'):
-        return self.run_sql('claim.sql', source, token, 60)
+        return self.run_sql('claim.sql', source, token, 60, 5)
 
     def ack(self, key, token='lease-a', source='test-store'):
         return self.run_sql('ack.sql', source, key, token)

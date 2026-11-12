@@ -44,7 +44,15 @@ public final class TebexInboxConsumer implements AutoCloseable {
         if(closed)return false;
         try {
             Reply reply=transport.post("/consumer/claim","{}");
-            if(reply.status()==204) {status="EMPTY";return true;}
+            if(reply.status()==204) {
+                // No claimable event does not mean healthy: quarantine and an
+                // exhausted backlog require attention without automatic replay.
+                Reply health=transport.post("/consumer/status","{}");
+                if(health.status()!=200 || health.body().length()>4096)throw new IllegalStateException();
+                var attention=JsonParser.parseString(health.body()).getAsJsonObject().get("attention");
+                if(attention==null || !attention.isJsonPrimitive() || !attention.getAsJsonPrimitive().isBoolean())throw new IllegalStateException();
+                status=attention.getAsBoolean()?"ATTENTION":"EMPTY";return true;
+            }
             if(reply.status()!=200 || reply.body().length()>350000)throw new IllegalStateException();
             JsonObject claim=JsonParser.parseString(reply.body()).getAsJsonObject();
             String id=claim.get("id").getAsString(), lease=claim.get("lease_token").getAsString();
@@ -86,7 +94,7 @@ public final class TebexInboxConsumer implements AutoCloseable {
             this.origin=origin;this.token=token;this.client=client;
         }
         public Reply post(String path,String body) throws Exception {
-            if(!Set.of("/consumer/claim","/consumer/ack").contains(path))throw new IllegalArgumentException();
+            if(!Set.of("/consumer/claim","/consumer/ack","/consumer/status").contains(path))throw new IllegalArgumentException();
             var request=HttpRequest.newBuilder(origin.resolve(path)).timeout(Duration.ofSeconds(10))
                     .header("Authorization","Bearer "+token).header("Content-Type","application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(body)).build();

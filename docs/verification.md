@@ -147,3 +147,10 @@ These are Windows/JDK 25 local results, not production or Linux acceptance.
 See [route evidence](../ops/donor-webhook/route-evidence.md) and
 [route plan](../ops/donor-webhook/route-plan.md). PR #8 remains separate. No
 production restart, configuration change, DNS update or endpoint activation.
+
+## Inbox policy preparation - 2026-11-12
+
+See [policy requirements and evidence](../ops/donor-webhook/pull-inbox/policy.md)
+for capacity/quarantine/retention red-green tests and remaining hosted/operational
+gates. The plugin reports attention when idle claims conceal quarantined work.
+No production changes; PR #9 remains draft.
