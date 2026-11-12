@@ -1,0 +1,18 @@
+{
+  "enabled": false,
+  "provider": null,
+  "primary_owner": null,
+  "backup_owner": null,
+  "alert_destination": null,
+  "runner": "independent of Bloom and Cloudflare",
+  "command": ["node", "monitor.mjs", "--check"],
+  "secret_environment": ["INBOX_MONITOR_ORIGIN", "INBOX_MONITOR_TOKEN"],
+  "interval_seconds": 300,
+  "process_deadline_seconds": 10,
+  "missing_result_after_seconds": 900,
+  "open_after_consecutive_results": { "WARNING": 3, "CRITICAL": 2, "UNKNOWN": 2 },
+  "recover_after_consecutive_ok": 3,
+  "repeat_notification_seconds": 3600,
+  "retain_sanitized_results_days": 14,
+  "automatic_remediation": false
+}

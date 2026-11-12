@@ -47,6 +47,8 @@ jobs:
         run: mvn --batch-mode --no-transfer-progress test-compile
       - name: Test outbound inbox SQL protocol (SQLite, not hosted D1)
         run: python3 ops/donor-webhook/pull-inbox/test_storage.py
+      - name: Test synthetic backup restore consequences (local only)
+        run: python3 ops/donor-webhook/pull-inbox/test_backup_review.py
       - name: Set up Node for isolated Worker tests
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:

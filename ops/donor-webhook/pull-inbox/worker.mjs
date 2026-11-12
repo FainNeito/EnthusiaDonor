@@ -80,12 +80,15 @@ export function createWorker(sql) {
     try {
       const url = new URL(request.url);
       if (url.protocol !== 'https:') return response(400);
-      if (url.search || !['/tebex', '/consumer/claim', '/consumer/ack', '/consumer/status'].includes(url.pathname)) return response(404);
+      if (url.search || !['/tebex', '/consumer/claim', '/consumer/ack', '/consumer/status', '/monitor/status'].includes(url.pathname)) return response(404);
       if (request.method !== 'POST') return response(405);
       if (typeof env.SOURCE !== 'string' || !/^[a-z0-9_.-]{1,64}$/.test(env.SOURCE)
           || ![env.TEBEX_SECRET, env.CONSUMER_SECRET].every(s => typeof s === 'string' && encoder.encode(s).length >= 32 && s.length <= 256)
           || env.TEBEX_SECRET === env.CONSUMER_SECRET) return response(503);
       if (request.headers.has('content-encoding')) return response(415);
+      if (env.MONITOR_SECRET !== undefined && (typeof env.MONITOR_SECRET !== 'string'
+          || !/^[A-Za-z0-9_-]{32,256}$/.test(env.MONITOR_SECRET)
+          || [env.TEBEX_SECRET, env.CONSUMER_SECRET].includes(env.MONITOR_SECRET))) return response(503);
       const limits = policy(env);
       if (url.pathname === '/tebex') {
         const signature = request.headers.get('x-signature') || '';
@@ -110,9 +113,13 @@ export function createWorker(sql) {
         if (!result.success || result.results?.length !== 1) return response(503);
         return response(200, {});
       }
-      if (!await authorized(request, env.CONSUMER_SECRET)) return response(403);
+      const monitoring = url.pathname === '/monitor/status';
+      // Optional independent credential: never grant a monitor consumer powers.
+      // Reused/malformed configured credentials fail closed above for every route.
+      if (monitoring && env.MONITOR_SECRET === undefined) return response(503);
+      if (!await authorized(request, monitoring ? env.MONITOR_SECRET : env.CONSUMER_SECRET)) return response(403);
       const input = json(await boundedBody(request, 1024));
-      if (url.pathname === '/consumer/status') {
+      if (url.pathname === '/consumer/status' || monitoring) {
         if (Object.keys(input).length) return response(400);
         const row = await env.DB.prepare(sql.status).bind(env.SOURCE, limits.attempts).first();
         if (!row) return response(503);

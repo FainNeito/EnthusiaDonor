@@ -154,3 +154,12 @@ See [policy requirements and evidence](../ops/donor-webhook/pull-inbox/policy.md
 for capacity/quarantine/retention red-green tests and remaining hosted/operational
 gates. The plugin reports attention when idle claims conceal quarantined work.
 No production changes; PR #9 remains draft.
+
+## External monitor and backup review preparation - 2026-11-12
+
+[Monitoring evidence](../ops/donor-webhook/pull-inbox/monitoring.md) covers read-only
+credential isolation, status freshness/classification, safe output and local HTTPS
+protections. [Backup review](../ops/donor-webhook/pull-inbox/backup-retention-review.md)
+records plan-specific Time Travel documentation and a synthetic SQLite restore
+that resurrects previously ACKed/pruned data. No hosted monitor, backup, restore,
+notification, restart or activation occurred. PR #9 remains draft.

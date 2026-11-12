@@ -174,8 +174,10 @@ atomic admission bounds, isolates exhausted expired leases, prunes old completed
 tombstones, and exposes authenticated attention status to the consumer. Pending
 and quarantined payloads are preserved without automatic expiry. Before
 activation, validate account capacity/cost, establish external alerting and
-operator ownership, review backup/raw-data retention, and implement operational
-credential rotation. Verify actual account quotas/billing, hosted D1
+operator ownership, resolve the account-specific gates in the
+[backup-retention review](pull-inbox/backup-retention-review.md), and implement
+operational credential rotation. An inactive [external monitoring adapter and
+integration proposal](pull-inbox/monitoring.md) is now prepared. Verify actual account quotas/billing, hosted D1
 behavior, Bloom outbound egress, publisher failover and full payment-to-delivery
 acceptance under a separately authorized isolated hosted plan. The existing
 late-enrichment and gift-identity limitations remain.

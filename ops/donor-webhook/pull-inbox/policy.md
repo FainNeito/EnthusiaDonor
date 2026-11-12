@@ -94,7 +94,10 @@ No bodies, signatures or IDs are returned. The plugin queries status when a clai
 returns 204 and displays INBOX_ATTENTION instead of INBOX_EMPTY when needed. Failed
 or malformed status responses produce INBOX_RETRY, never a false healthy state.
 This is a pull-based status signal, not an external alert service or notification.
-External monitoring, ownership and escalation remain deployment gates.
+A read-only external probe and inactive integration proposal are now prepared in
+[monitoring.md](monitoring.md); provider installation, ownership and escalation
+remain deployment gates. [Backup review](backup-retention-review.md) distinguishes
+plan-specific Time Travel history from live retention and records restore risks.
 
 `schema.sql` is now v2 for fresh databases. No hosted v1 database was created in
 this task, so there is no live migration. The v1 CHECK constraint does not allow

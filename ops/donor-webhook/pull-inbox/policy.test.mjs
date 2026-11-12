@@ -28,6 +28,30 @@ async function fixture(t, bindings = {}) {
   return { db, post, send, expire };
 }
 
+test('monitor credentials are read-only and status cannot mutate stored events', async t => {
+  const monitor = 'synthetic-read-only-monitor-token-32-bytes';
+  const f = await fixture(t, { MONITOR_SECRET: monitor, INBOX_MAX_ATTEMPTS: '1' });
+  await f.send('preserve'); await f.post('/consumer/claim'); await f.expire();
+  const before = await f.db.prepare('SELECT * FROM inbox').all();
+  const r = await f.post('/monitor/status', {}, monitor); assert.equal(r.status, 200);
+  const status = await r.json(); assert.equal(status.exhausted, 1); assert.equal(status.attention, true);
+  assert.ok(Number.isSafeInteger(status.observed_at));
+  for (const path of ['/consumer/claim', '/consumer/ack', '/consumer/status'])
+    assert.equal((await f.post(path, {}, monitor)).status, 403);
+  assert.equal((await f.post('/monitor/status', {}, consumer)).status, 403);
+  assert.equal((await f.post('/monitor/status', { source: 'other' }, monitor)).status, 400);
+  assert.deepEqual((await f.db.prepare('SELECT * FROM inbox').all()).results, before.results);
+});
+
+test('absent monitor binding is disabled; credential reuse never grants monitoring consumer powers', async t => {
+  const missing = await fixture(t);
+  assert.equal((await missing.post('/monitor/status')).status, 503);
+  assert.equal((await missing.post('/consumer/claim')).status, 204);
+  const reused = await fixture(t, { MONITOR_SECRET: consumer });
+  for (const path of ['/monitor/status', '/consumer/claim', '/consumer/ack'])
+    assert.equal((await reused.post(path)).status, 503);
+});
+
 test('atomic row capacity: concurrent unique arrivals cannot over-admit; duplicates still succeed', async t => {
   const f = await fixture(t, { INBOX_MAX_ROWS: '1' });
   const responses = await Promise.all(['one', 'two'].map(id => f.send(id)));

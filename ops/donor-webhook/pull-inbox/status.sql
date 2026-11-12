@@ -1,5 +1,5 @@
 -- Bind: source, max attempts. Aggregates only; no IDs, signatures or bodies.
-SELECT count(*) AS rows, coalesce(sum(length(body)),0) AS payload_bytes,
+SELECT unixepoch() AS observed_at, count(*) AS rows, coalesce(sum(length(body)),0) AS payload_bytes,
        coalesce(sum(source=?1 AND state='pending'),0) AS pending,
        coalesce(sum(source=?1 AND state='quarantined'),0) AS quarantined,
        coalesce(sum(source=?1 AND state='done'),0) AS completed,
