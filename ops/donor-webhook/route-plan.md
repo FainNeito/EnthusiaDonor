@@ -20,6 +20,11 @@ review limitations and future cutover/rollback steps below are the trace.
 
 ## Proposed topology and unresolved placement
 
+The [2026-11-12 Bloom verification](bloom-verification.md) records the latest
+panel findings, per-hop transport gaps and unsent support questions. SMP exposes
+a Java startup command without a separate supervisor; the observed Cloudflare
+zone default is Full, not Full (strict). Activation gates remain in place.
+
 ```text
 Tebex HTTPS POST https://donations.enthusia.info/tebex
   -> Cloudflare (dedicated hostname; no interactive Access challenge)
@@ -105,8 +110,9 @@ limits and header timeout provide the earlier bound. NGINX `client_body_timeout`
 is inactivity-based: a client dripping bytes within that interval can retain an
 admission slot. The template does **not** impose a total upload deadline or prove
 fairness under hostile load. A verified outer absolute deadline or equivalent
-bounded occupancy policy remains a production gate. Windows NGINX tests do not
-prove Linux epoll behavior, host firewall rules, TLS or Bloom proxy behavior.
+bounded occupancy policy remains a production gate. Subsequent Linux Java 21/25
+route CI passed at `db457225a7572b4da2dc4f5b9e260cce230e2e30`; neither local nor
+CI fixtures prove host firewall rules, TLS or Bloom proxy behavior.
 
 ## Reproduce locally
 
