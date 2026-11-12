@@ -120,6 +120,24 @@ class TebexWebhookEvidenceTest {
             assertEquals(405,http.send(java.net.http.HttpRequest.newBuilder(uri).GET().build(),java.net.http.HttpResponse.BodyHandlers.discarding()).statusCode());
         }
     }
+    @Test void rejectsInvalidHeadersWithoutWaitingForRequestBody() throws Exception {
+        var endpoint=new com.enthusia.donors.sandbox.official.notifications.TebexWebhookEndpoint(SECRET,null);
+        try(var receiver=new com.enthusia.donors.sandbox.official.notifications.TebexHttpReceiver(new java.net.InetSocketAddress("127.0.0.1",0),endpoint)) {
+            receiver.start();
+            String[] headers={"Content-Length: 100\r\n", "Content-Length: 100\r\nX-Signature: invalid\r\n",
+                    "Content-Length: 100\r\nX-Signature: "+"0".repeat(64)+"\r\nX-Signature: "+"1".repeat(64)+"\r\n",
+                    "Content-Length: 262145\r\nX-Signature: "+"0".repeat(64)+"\r\n"};
+            for(int i=0;i<headers.length;i++) {
+                try(var socket=new java.net.Socket("127.0.0.1",receiver.port())) {
+                    socket.setSoTimeout(2000);
+                    socket.getOutputStream().write(("POST /tebex HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n"+headers[i]+"\r\n").getBytes(StandardCharsets.US_ASCII));
+                    socket.getOutputStream().flush();
+                    String status=new java.io.BufferedReader(new java.io.InputStreamReader(socket.getInputStream(),StandardCharsets.US_ASCII)).readLine();
+                    assertNotNull(status);assertTrue(status.contains(i==3?"413":"403"),status);
+                }
+            }
+        }
+    }
     @Test void signedHttpReplayCreatesOneOutboxJobPerChannel(@org.junit.jupiter.api.io.TempDir java.nio.file.Path dir) throws Exception {
         var now=java.time.Instant.now();
         var p=new com.enthusia.donors.model.PaymentRecord("http-fixture",java.util.UUID.randomUUID(),"Donor",java.math.BigDecimal.TEN,"USD","complete",now,false,false,java.util.List.of(1),now);
