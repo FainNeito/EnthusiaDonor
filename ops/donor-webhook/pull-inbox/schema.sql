@@ -1,4 +1,4 @@
--- Preparation schema v3. Fresh local databases only. No live migration executed.
+-- Preparation schema v4. Fresh local databases only. No live migration executed.
 CREATE TABLE inbox (
     source TEXT NOT NULL,
     id TEXT NOT NULL,
@@ -30,6 +30,14 @@ CREATE TABLE inbox_usage (
 INSERT INTO inbox_usage VALUES(1,0,0);
 CREATE INDEX inbox_attempts ON inbox(source,state,attempts,lease_until,created_at,id);
 
+CREATE TABLE inbox_source_usage (
+    source TEXT PRIMARY KEY,
+    pending INTEGER NOT NULL CHECK(pending>=0),
+    quarantined INTEGER NOT NULL CHECK(quarantined>=0),
+    completed INTEGER NOT NULL CHECK(completed>=0)
+);
+CREATE INDEX inbox_source_age ON inbox(source,state,created_at);
+
 -- TRIGGERS START
 -- These triggers are mandatory; apply the entire schema before any inbox writes.
 CREATE TRIGGER inbox_usage_insert AFTER INSERT ON inbox BEGIN
@@ -45,4 +53,32 @@ END;
 CREATE TRIGGER inbox_usage_delete AFTER DELETE ON inbox BEGIN
   SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM inbox_usage WHERE singleton=1) THEN RAISE(ABORT,'missing inbox usage') END;
   UPDATE inbox_usage SET rows=rows-1, payload_bytes=payload_bytes-coalesce(length(OLD.body),0) WHERE singleton=1;
+END;
+
+-- trigger-break
+CREATE TRIGGER inbox_source_insert AFTER INSERT ON inbox BEGIN
+  SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM inbox_source_usage WHERE source=NEW.source)
+    AND EXISTS(SELECT 1 FROM inbox WHERE source=NEW.source AND id!=NEW.id)
+    THEN RAISE(ABORT,'missing source usage') END;
+  INSERT INTO inbox_source_usage VALUES(NEW.source,NEW.state='pending',NEW.state='quarantined',NEW.state='done')
+  ON CONFLICT(source) DO UPDATE SET pending=pending+(NEW.state='pending'),
+    quarantined=quarantined+(NEW.state='quarantined'), completed=completed+(NEW.state='done');
+END;
+-- trigger-break
+CREATE TRIGGER inbox_source_delete AFTER DELETE ON inbox BEGIN
+  UPDATE inbox_source_usage SET pending=pending-(OLD.state='pending'),
+    quarantined=quarantined-(OLD.state='quarantined'), completed=completed-(OLD.state='done') WHERE source=OLD.source;
+  SELECT CASE WHEN changes()!=1 THEN RAISE(ABORT,'missing source usage') END;
+END;
+-- trigger-break
+CREATE TRIGGER inbox_source_update AFTER UPDATE OF state,source ON inbox WHEN OLD.state!=NEW.state OR OLD.source!=NEW.source BEGIN
+  SELECT CASE WHEN OLD.source!=NEW.source AND NOT EXISTS(SELECT 1 FROM inbox_source_usage WHERE source=NEW.source)
+    AND EXISTS(SELECT 1 FROM inbox WHERE source=NEW.source AND id!=NEW.id)
+    THEN RAISE(ABORT,'missing source usage') END;
+  UPDATE inbox_source_usage SET pending=pending-(OLD.state='pending'),
+    quarantined=quarantined-(OLD.state='quarantined'), completed=completed-(OLD.state='done') WHERE source=OLD.source;
+  SELECT CASE WHEN changes()!=1 THEN RAISE(ABORT,'missing source usage') END;
+  INSERT INTO inbox_source_usage VALUES(NEW.source,NEW.state='pending',NEW.state='quarantined',NEW.state='done')
+  ON CONFLICT(source) DO UPDATE SET pending=pending+(NEW.state='pending'),
+    quarantined=quarantined+(NEW.state='quarantined'), completed=completed+(NEW.state='done');
 END;

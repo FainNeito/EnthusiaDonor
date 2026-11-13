@@ -6,7 +6,50 @@ local Miniflare D1 databases and prints `meta.rows_read`/`rows_written` per SQL
 statement. It performs operations in the listed order; quarantine mutates rows.
 It is a local simulator measurement, not a hosted invoice or guarantee.
 
-## 2026-11-13 local D1 results (schema v3)
+## Mixed backlog and status tuning (schema v4)
+
+| 10,000-row local fixture | status reads | claim reads | quarantine reads / writes |
+| --- | ---: | ---: | ---: |
+| completed | 5 | 13 | 3 / 0 |
+| exhausted | 10,004 | 13 | 800 / 700 |
+| leased | 5 | 13 | 3 / 0 |
+| 9,999 exhausted, one leased | 10,003 | 13 | 800 / 700 |
+| 9,999 leased, one exhausted | 5 | 13 | 8 / 7 |
+
+Counts come from synthetic local Miniflare D1 with default max attempts 5;
+they are not hosted billing. Claim probes each attempt count below the configured
+limit (maximum 20) with an equality and lease-time index range. It preserves
+attempt-priority ordering but may delay higher-attempt events under sustained
+lower-attempt traffic. The aggregate status retains exact source counts and
+age/attention semantics. Transactionally maintained per-source counters remove
+full scans for ordinary completed/leased data; oldest pending/quarantine use an
+age index. Exact expired-exhausted count can still read all exhausted rows and
+also scan active final-attempt leases. The status query has not become universally
+constant cost. Quarantine now writes more due to the additional counters/index.
+
+For an illustrative one-consumer idle day at the 5-second minimum, with default
+attempts, no exhaustion and the local measurements above, 17,280 polls times
+roughly 18 reads (claim 13 plus two maintenance queries 3+2) is 311,040 reads;
+288 independent and 48 consumer status queries at five reads each add 1,680.
+This is not a quota reservation or worst-case forecast: monitor is inactive,
+5–7 seconds is jittered, billing may differ, and other workloads, event traffic,
+retries, exhausted rows, writes and request/CPU quotas are excluded. The shared
+Free limit and health-signal latency still require measured headroom and hosted
+validation before activation.
+
+Schema v4 is fresh-only. Its usage and per-source counters depend on all mandatory
+triggers; missing counters fail closed in tested cases, but missing triggers or
+manual counter changes can silently corrupt counts. Validate schema/trigger
+presence and reconcile both global and per-source counters against inbox contents
+under a separately authorized ingestion/consumer boundary, before any restore or
+migration. No migration for populated v1–v3 databases is supplied. Counter and
+index writes count against the shared write budget; no production setup occurred.
+
+Two targeted pre-change local tests failed on 10,002 mixed-claim and 10,000
+completed-status reads. The updated suite exercises exact counts through source
+and state changes, rollback, missing metadata and mixed backlog. See PR CI.
+
+## Earlier baseline: schema v3
 
 | 10,000-row fixture | status reads | claim reads | quarantine reads / writes | prune reads | full admission reads |
 | --- | ---: | ---: | ---: | ---: | ---: |
@@ -17,8 +60,8 @@ It is a local simulator measurement, not a hosted invoice or guarantee.
 | 9,999 leased, one exhausted | 10,000 | 10,002 | 6 / 4 | 2 | 3 |
 
 The previous all-exhausted measurements were 10,002 claim reads and 20,500
-quarantine reads / 300 writes; capacity-full admission read 10,002. The revised
-queries improve those cases at the cost of additional index writes. The last row
+quarantine reads / 300 writes; capacity-full admission read 10,002. The v3
+queries improved those cases at the cost of additional index writes. The last row
 shows an adversarial mix still causes a full claim scan. The Worker runs bounded
 quarantine before claim, but larger mixes can still leave exhausted rows after a
 pass; no general constant-time or quota guarantee is claimed. Claim now orders by
@@ -46,7 +89,7 @@ or malformed refresh produces RETRY, and is retried. Attention changes can take
 up to 30 minutes to appear locally. The proposed independent monitor remains
 inactive; its five-minute signal is not available until separately installed.
 
-This does **not** establish quota compliance: 3.36M/day in status scans alone
+The earlier v3 baseline did **not** establish quota compliance: 3.36M/day in status scans alone
 leaves under 1.64M for all other account traffic, and some mixed backlog patterns can still scan thousands per claim. Idle claim plus maintenance run every
 5–7 seconds, and batches with many exhausted rows can consume quota quickly.
 Additional consumers, traffic, retries, and non-donor databases share the limit.

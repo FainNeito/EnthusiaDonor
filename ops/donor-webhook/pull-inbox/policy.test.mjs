@@ -256,3 +256,53 @@ test('usage remains equal to stored data across sources and failed batch rollbac
  await verify(); assert.equal(await f.db.prepare("SELECT id FROM inbox WHERE id='rolled-back'").first(),null);
  await f.db.prepare("DELETE FROM inbox WHERE source='other'").run();await verify();
 });
+
+test('mixed lease-heavy backlog and completed status avoid full scans', {timeout:30000}, async t => {
+ const f=await fixture(t);
+ await f.db.prepare(`WITH RECURSIVE c(x) AS (SELECT 1 UNION ALL SELECT x+1 FROM c WHERE x<10000)
+ INSERT INTO inbox(source,id,body,signature,attempts,lease_until)
+ SELECT 'isolated',printf('%064x',x),x'01','s',CASE WHEN x=10000 THEN 5 ELSE 1 END,
+ CASE WHEN x=10000 THEN 0 ELSE unixepoch()+3600 END FROM c`).run();
+ const sql=name=>readFileSync(new URL(name+'.sql',import.meta.url),'utf8');
+ const claim=await f.db.prepare(sql('claim')).bind('isolated','token',90,5).run();
+ assert.ok(claim.meta.rows_read<200, `claim read ${claim.meta.rows_read}`);
+ await f.db.prepare("DELETE FROM inbox").run();
+ await f.db.prepare(`WITH RECURSIVE c(x) AS (SELECT 1 UNION ALL SELECT x+1 FROM c WHERE x<10000)
+ INSERT INTO inbox(source,id,state,completed_at) SELECT 'isolated',printf('%064x',x),'done',unixepoch() FROM c`).run();
+ const status=await f.db.prepare(sql('status')).bind('isolated',5).run();
+ assert.equal(status.results[0].completed,10000);
+ assert.ok(status.meta.rows_read<200, `status read ${status.meta.rows_read}`);
+});
+
+test('completed status avoids a full inbox scan', {timeout:30000}, async t => {
+ const f=await fixture(t);
+ await f.db.prepare(`WITH RECURSIVE c(x) AS (SELECT 1 UNION ALL SELECT x+1 FROM c WHERE x<10000)
+ INSERT INTO inbox(source,id,state,completed_at) SELECT 'isolated',printf('%064x',x),'done',unixepoch() FROM c`).run();
+ const status=await f.db.prepare(readFileSync(new URL('status.sql',import.meta.url),'utf8')).bind('isolated',5).run();
+ assert.equal(status.results[0].completed,10000);
+ assert.ok(status.meta.rows_read<200, `status read ${status.meta.rows_read}`);
+});
+
+test('maintained status equals direct aggregation through source and state transitions', async t => {
+ const f=await fixture(t, { INBOX_MAX_ATTEMPTS:'1' });
+ await f.send('one'); await f.send('two');
+ let claim=await (await f.post('/consumer/claim')).json(); await f.post('/consumer/ack',{id:claim.id,lease_token:claim.lease_token});
+ claim=await (await f.post('/consumer/claim')).json(); await f.expire();
+ const sql=readFileSync(new URL('status.sql',import.meta.url),'utf8');
+ const verify=async source=>{
+   const status=await f.db.prepare(sql).bind(source,1).first();
+   const actual=await f.db.prepare(`SELECT count(*) AS rows,coalesce(sum(length(body)),0) AS payload_bytes,
+   coalesce(sum(source=?1 AND state='pending'),0) AS pending,coalesce(sum(source=?1 AND state='quarantined'),0) AS quarantined,
+   coalesce(sum(source=?1 AND state='done'),0) AS completed,
+   coalesce(sum(source=?1 AND state='pending' AND attempts>=1 AND lease_until<=unixepoch()),0) AS exhausted FROM inbox`).bind(source).first();
+   for(const k of Object.keys(actual)) assert.equal(status[k],actual[k],k);
+ };
+ await verify('isolated'); await verify('other');
+ await f.post('/consumer/claim'); await verify('isolated');
+ await f.db.prepare("UPDATE inbox SET source='other' WHERE state='quarantined'").run();
+ await verify('isolated'); await verify('other');
+ await f.db.prepare("DELETE FROM inbox WHERE source='other'").run(); await verify('other');
+ await f.db.prepare("DELETE FROM inbox_source_usage WHERE source='isolated'").run();
+ assert.equal((await f.post('/consumer/status')).status,503);
+ assert.equal((await f.send('third')).status,503);
+});

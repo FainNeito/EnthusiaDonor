@@ -1,8 +1,11 @@
--- Bind: source, max attempts. Aggregates only; no IDs, signatures or bodies.
-SELECT unixepoch() AS observed_at, count(*) AS rows, coalesce(sum(length(body)),0) AS payload_bytes,
-       coalesce(sum(source=?1 AND state='pending'),0) AS pending,
-       coalesce(sum(source=?1 AND state='quarantined'),0) AS quarantined,
-       coalesce(sum(source=?1 AND state='done'),0) AS completed,
-       coalesce(sum(source=?1 AND state='pending' AND attempts>=?2 AND lease_until<=unixepoch()),0) AS exhausted,
-       coalesce(max(CASE WHEN source=?1 AND state!='done' THEN max(0,unixepoch()-created_at) END),0) AS oldest_unprocessed_seconds
-FROM inbox;
+-- Bind: source, max attempts. Indexed counts preserve exact status; no payloads or IDs.
+SELECT unixepoch() AS observed_at, u.rows, u.payload_bytes,
+       coalesce(s.pending,0) AS pending, coalesce(s.quarantined,0) AS quarantined,
+       coalesce(s.completed,0) AS completed,
+       (SELECT count(*) FROM inbox INDEXED BY inbox_attempts
+        WHERE source=?1 AND state='pending' AND attempts>=?2 AND lease_until<=unixepoch()) AS exhausted,
+       max(0,unixepoch()-min(
+         coalesce((SELECT min(created_at) FROM inbox INDEXED BY inbox_source_age WHERE source=?1 AND state='pending'),unixepoch()),
+         coalesce((SELECT min(created_at) FROM inbox INDEXED BY inbox_source_age WHERE source=?1 AND state='quarantined'),unixepoch())
+       )) AS oldest_unprocessed_seconds
+FROM inbox_usage u LEFT JOIN inbox_source_usage s ON s.source=?1 WHERE u.singleton=1 AND (s.source IS NOT NULL OR NOT EXISTS(SELECT 1 FROM inbox WHERE source=?1));

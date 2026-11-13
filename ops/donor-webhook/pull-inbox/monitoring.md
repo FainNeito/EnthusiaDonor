@@ -76,14 +76,10 @@ adapter. External storage/access/deletion behavior must be verified before use.
 
 ## Query cost and acceptance
 
-Status currently aggregates the bounded table. At the 10,000-row cap, five-minute
-external polling means 288 checks/day, potentially about 2.88 million scanned rows
-per day before other queries. This is a planning estimate, not measured D1 billing.
-The consumer now caches a successful idle status for up to 30 minutes, with
-attention retained and failed refresh reported as RETRY. This can delay local
-attention visibility by up to 30 minutes; the proposed independent five-minute
-monitor remains inactive. Measure/tune this before hosting; do not assume the
-logical storage cap or this monitor's cadence guarantees an account quota budget.
+Status now uses transactional global and source counters with indexed age and
+exhaustion queries. Normal completed/leased fixtures are inexpensive, but exact
+exhaustion counts can still scan the bounded pending set. See the measured
+[quota review](quota-review.md); do not assume a shared account budget is met.
 Physical storage and Time Travel remain separate from the reported payload bytes.
 
 Acceptance requires isolated hosted DNS/TLS and credential rotation/revocation

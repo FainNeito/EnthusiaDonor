@@ -186,3 +186,9 @@ scans still require further tuning and hosted quota verification. No deployment.
 transactional usage accounting and indexed queries, red tests and 40 Node plus
 nine SQLite tests. Adversarial mixed leases and shared quotas remain deployment
 gates. Schema v3 is fresh-only; no hosted migration or activation occurred.
+
+## Mixed backlog and status quota work — 2026-11-13
+
+[Quota evidence](../ops/donor-webhook/pull-inbox/quota-review.md) records red
+tests, local D1 measurements, remaining exhaustion scans and extra writes.
+Schema v4 is fresh-only; no hosted migration or activation occurred.
