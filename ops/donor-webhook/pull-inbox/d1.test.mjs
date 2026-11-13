@@ -14,8 +14,9 @@ test('local workerd/D1: authenticated ingestion, concurrent leases, redelivery, 
     bindings: { SOURCE: 'isolated', TEBEX_SECRET: secret, CONSUMER_SECRET: consumer } });
   try {
     const db = await mf.getD1Database('DB');
-    const schema = readFileSync(new URL('schema.sql', import.meta.url), 'utf8');
+    const schema = readFileSync(new URL('schema.sql', import.meta.url), 'utf8').split('-- TRIGGERS START')[0];
     for (const statement of schema.split(';').filter(s => s.trim())) await db.prepare(statement).run();
+        for (const statement of readFileSync(new URL('schema.sql', import.meta.url), 'utf8').split('-- TRIGGERS START')[1].split('-- trigger-break')) await db.prepare(statement).run();
     const post = (path, body, headers = {}) => mf.dispatchFetch('https://inbox.example' + path, { method: 'POST', body, headers });
     const claim = () => post('/consumer/claim', '{}', { authorization: 'Bearer ' + consumer });
     // Exact maximum body, including multibyte UTF-8, survives D1 BLOB serialization.

@@ -179,3 +179,10 @@ See [quota measurement and limits](../ops/donor-webhook/pull-inbox/quota-review.
 A new cache-cadence assertion failed before implementation and passes afterward;
 status can be up to 30 minutes old. Local D1 measures show backlog/admission
 scans still require further tuning and hosted quota verification. No deployment.
+
+## Admission and exhausted backlog quota work — 2026-11-13
+
+[Local D1 results](../ops/donor-webhook/pull-inbox/quota-review.md) record
+transactional usage accounting and indexed queries, red tests and 40 Node plus
+nine SQLite tests. Adversarial mixed leases and shared quotas remain deployment
+gates. Schema v3 is fresh-only; no hosted migration or activation occurred.

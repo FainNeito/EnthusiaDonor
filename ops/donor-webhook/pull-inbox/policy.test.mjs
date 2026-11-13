@@ -14,8 +14,9 @@ async function fixture(t, bindings = {}) {
     bindings: { SOURCE: 'isolated', TEBEX_SECRET: secret, CONSUMER_SECRET: consumer, ...bindings } });
   t.after(() => mf.dispose());
   const db = await mf.getD1Database('DB');
-  for (const statement of readFileSync(new URL('schema.sql', import.meta.url), 'utf8').split(';').filter(s => s.trim()))
+  for (const statement of readFileSync(new URL('schema.sql', import.meta.url), 'utf8').split('-- TRIGGERS START')[0].split(';').filter(s => s.trim()))
     await db.prepare(statement).run();
+    for (const statement of readFileSync(new URL('schema.sql', import.meta.url), 'utf8').split('-- TRIGGERS START')[1].split('-- trigger-break')) await db.prepare(statement).run();
   const post = (path, body = {}, auth = consumer) => mf.dispatchFetch('https://inbox.example' + path,
     { method: 'POST', body: JSON.stringify(body), headers: { authorization: 'Bearer ' + auth } });
   const send = (id, size) => {
@@ -189,4 +190,69 @@ test('status is authenticated and payload-free; invalid policy fails closed', as
   const status = JSON.parse(text); assert.equal(status.rows, 1); assert.equal(status.attention, true);
   const invalid = await fixture(t, { INBOX_MAX_ROWS: '0' });
   assert.equal((await invalid.send('invalid')).status, 503);
+});
+
+
+test('capacity metadata stays exact through duplicate, ACK and delete and fails closed if missing', async t => {
+  const f = await fixture(t, { INBOX_MAX_ROWS: '1' });
+  assert.equal((await f.send('quota')).status, 200);
+  const usage = async () => await f.db.prepare('SELECT rows, payload_bytes FROM inbox_usage WHERE singleton=1').first();
+  const initial=await usage(); assert.equal(initial.rows,1); assert.ok(initial.payload_bytes>0);
+  assert.equal((await f.send('quota')).status,200); assert.deepEqual(await usage(),initial);
+  const item=await (await f.post('/consumer/claim')).json();
+  assert.equal((await f.post('/consumer/ack',{id:item.id,lease_token:item.lease_token})).status,204);
+  assert.deepEqual(await usage(),{rows:1,payload_bytes:0});
+  await f.db.prepare('DELETE FROM inbox').run(); assert.deepEqual(await usage(),{rows:0,payload_bytes:0});
+  await f.db.prepare('DELETE FROM inbox_usage').run();
+  assert.equal((await f.send('blocked')).status,503);
+});
+
+test('large exhausted backlog and capacity checks stay bounded in local D1', {timeout:30000}, async t => {
+  const f=await fixture(t);
+  await f.db.prepare(`WITH RECURSIVE c(x) AS (SELECT 1 UNION ALL SELECT x+1 FROM c WHERE x<10000)
+    INSERT INTO inbox(source,id,body,signature,attempts,lease_until)
+    SELECT 'isolated',printf('%064x',x),x'01','s',5,0 FROM c`).run();
+  const sql=name=>readFileSync(new URL(name+'.sql',import.meta.url),'utf8');
+  const claim=await f.db.prepare(sql('claim')).bind('isolated','token',90,5).run();
+  assert.ok(claim.meta.rows_read<100, `claim read ${claim.meta.rows_read}`);
+  const quarantine=await f.db.prepare(sql('quarantine')).bind('isolated',5).run();
+  assert.ok(quarantine.meta.rows_read<1000, `quarantine read ${quarantine.meta.rows_read}`);
+  const enqueue=await f.db.prepare(sql('enqueue')).bind('isolated','f'.repeat(64),new Uint8Array([1]),'s',10000,67108864).run();
+  assert.ok(enqueue.meta.rows_read<100, `enqueue read ${enqueue.meta.rows_read}`);
+});
+
+test('large active lease set does not cause a full idle claim scan', {timeout:30000}, async t => {
+ const f=await fixture(t);
+ await f.db.prepare(`WITH RECURSIVE c(x) AS (SELECT 1 UNION ALL SELECT x+1 FROM c WHERE x<10000)
+ INSERT INTO inbox(source,id,body,signature,attempts,lease_until)
+ SELECT 'isolated',printf('%064x',x),x'01','s',1,unixepoch()+3600 FROM c`).run();
+ const claim=await f.db.prepare(readFileSync(new URL('claim.sql',import.meta.url),'utf8')).bind('isolated','token',90,5).run();
+ assert.ok(claim.meta.rows_read<100, `claim read ${claim.meta.rows_read}`);
+});
+
+test('mostly exhausted backlog with one active lease avoids a full claim scan', {timeout:30000}, async t => {
+ const f=await fixture(t);
+ await f.db.prepare(`WITH RECURSIVE c(x) AS (SELECT 1 UNION ALL SELECT x+1 FROM c WHERE x<10000)
+ INSERT INTO inbox(source,id,body,signature,attempts,lease_until)
+ SELECT 'isolated',printf('%064x',x),x'01','s',CASE WHEN x=10000 THEN 1 ELSE 5 END,
+ CASE WHEN x=10000 THEN unixepoch()+3600 ELSE 0 END FROM c`).run();
+ const claim=await f.db.prepare(readFileSync(new URL('claim.sql',import.meta.url),'utf8')).bind('isolated','token',90,5).run();
+ assert.ok(claim.meta.rows_read<100, `claim read ${claim.meta.rows_read}`);
+});
+
+test('usage remains equal to stored data across sources and failed batch rollback', async t => {
+ const f=await fixture(t);
+ const ins=f.db.prepare('INSERT INTO inbox(source,id,body,signature) VALUES(?1,?2,?3,?4)');
+ await ins.bind('isolated','one',new Uint8Array([1,2,3]),'s').run();
+ await ins.bind('other','two',new Uint8Array([4,5]),'s').run();
+ const verify=async()=>{
+   const actual=await f.db.prepare('SELECT count(*) AS rows,coalesce(sum(length(body)),0) AS payload_bytes FROM inbox').first();
+   const recorded=await f.db.prepare('SELECT rows,payload_bytes FROM inbox_usage WHERE singleton=1').first();
+   assert.deepEqual(recorded,actual);
+ };
+ await verify();
+ await f.db.prepare("UPDATE inbox SET body=x'01020304' WHERE id='one'").run(); await verify();
+ await assert.rejects(f.db.batch([ins.bind('isolated','rolled-back',new Uint8Array([1]),'s'),ins.bind('isolated','one',new Uint8Array([1]),'s')]));
+ await verify(); assert.equal(await f.db.prepare("SELECT id FROM inbox WHERE id='rolled-back'").first(),null);
+ await f.db.prepare("DELETE FROM inbox WHERE source='other'").run();await verify();
 });

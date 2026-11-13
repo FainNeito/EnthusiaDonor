@@ -1,4 +1,4 @@
--- Preparation schema v2. Fresh local databases only. No live migration executed.
+-- Preparation schema v3. Fresh local databases only. No live migration executed.
 CREATE TABLE inbox (
     source TEXT NOT NULL,
     id TEXT NOT NULL,
@@ -20,3 +20,29 @@ CREATE TABLE inbox (
 );
 CREATE INDEX inbox_pending ON inbox(source,state,lease_until,created_at,id);
 CREATE INDEX inbox_completed ON inbox(source,state,completed_at,id);
+
+-- Singleton accounting is maintained transactionally by the triggers below.
+CREATE TABLE inbox_usage (
+    singleton INTEGER PRIMARY KEY CHECK(singleton=1),
+    rows INTEGER NOT NULL CHECK(rows>=0),
+    payload_bytes INTEGER NOT NULL CHECK(payload_bytes>=0)
+);
+INSERT INTO inbox_usage VALUES(1,0,0);
+CREATE INDEX inbox_attempts ON inbox(source,state,attempts,lease_until,created_at,id);
+
+-- TRIGGERS START
+-- These triggers are mandatory; apply the entire schema before any inbox writes.
+CREATE TRIGGER inbox_usage_insert AFTER INSERT ON inbox BEGIN
+  SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM inbox_usage WHERE singleton=1) THEN RAISE(ABORT,'missing inbox usage') END;
+  UPDATE inbox_usage SET rows=rows+1, payload_bytes=payload_bytes+coalesce(length(NEW.body),0) WHERE singleton=1;
+END;
+-- trigger-break
+CREATE TRIGGER inbox_usage_update AFTER UPDATE OF body ON inbox WHEN OLD.body IS NOT NEW.body BEGIN
+  SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM inbox_usage WHERE singleton=1) THEN RAISE(ABORT,'missing inbox usage') END;
+  UPDATE inbox_usage SET payload_bytes=payload_bytes-coalesce(length(OLD.body),0)+coalesce(length(NEW.body),0) WHERE singleton=1;
+END;
+-- trigger-break
+CREATE TRIGGER inbox_usage_delete AFTER DELETE ON inbox BEGIN
+  SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM inbox_usage WHERE singleton=1) THEN RAISE(ABORT,'missing inbox usage') END;
+  UPDATE inbox_usage SET rows=rows-1, payload_bytes=payload_bytes-coalesce(length(OLD.body),0) WHERE singleton=1;
+END;
