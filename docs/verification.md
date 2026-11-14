@@ -206,3 +206,11 @@ hosted migration, alert or activation occurred.
 record UTC daily usage, its early-day limitation, baseline/reserve gates and
 isolated test/cleanup criteria. No hosted resources, traffic or production changes
 were created. Actual Free-quota fit and hosted acceptance remain unverified.
+
+## Baseline evidence and isolated test manifest — 2026-11-13
+
+[Hosted acceptance](../ops/donor-webhook/pull-inbox/hosted-acceptance.md) records
+a second partial-day snapshot, rounded account billing-period totals and one
+database rolling seven-day view. The account-wide complete UTC-day series is not
+available from these observations. An inactive manifest remains unbound and has
+no execution mechanism. No hosted test or production action occurred.
