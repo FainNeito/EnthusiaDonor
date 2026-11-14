@@ -6,7 +6,53 @@ local Miniflare D1 databases and prints `meta.rows_read`/`rows_written` per SQL
 statement. It performs operations in the listed order; quarantine mutates rows.
 It is a local simulator measurement, not a hosted invoice or guarantee.
 
-## Mixed backlog and status tuning (schema v4)
+## Exhaustion signal and write tuning (schema v5)
+
+Routine status now exposes `exhausted_present` as numeric 0 or 1: it means at
+least one pending event has reached the configured maximum attempts and its
+lease has expired. It is **not a count**. `inspect-exhausted-count.sql` provides
+an exact operator-only count on demand and may scan the full backlog. Attention
+and CRITICAL classification still activate when any such event exists; a live
+final-attempt lease does not count until expiry. The field was renamed deliberately:
+old and new monitor/Worker versions must be paired; the strict new monitor returns
+UNKNOWN on an old response. Schema v5 enforces integer attempts 0–20, matching the
+validated policy range, and probes indexed attempt/lease ranges to find presence.
+No migration from populated v1–v4 is provided; verify data and install all
+mandatory triggers before any separately authorized migration or restore.
+
+| Local D1 scenario | Prior v4 | v5 |
+| --- | ---: | ---: |
+| Status, 10,000 exhausted rows | 10,004 reads | 6 reads |
+| Status, 10,000 completed or active leased rows | 5 reads | 37 reads |
+| Quarantine 100 exhausted rows | 800 reads / 700 writes | 800 reads / 400 writes |
+| New admission | 7 reads / 9 writes | 7 reads / 7 writes |
+| Duplicate admission | 6 reads / 5 writes | 6 reads / 3 writes |
+| Claim one | 15 reads / 3 writes | 15 reads / 2 writes |
+| ACK one | 7 reads / 8 writes | 7 reads / 6 writes |
+| Prune one completed row | 7 reads / 3 writes | 7 reads / 3 writes |
+
+Measurements are synthetic Miniflare D1, default max attempts 5, not hosted
+billing; the figures for individual writes come from `quota-write-measure.mjs`
+with baseline ref `37d4684efb78dc9e3730427d5e972d1ba25799cf`. The removed
+redundant index and partial pending/completed indexes reduce writes at the cost
+of more index probes for an empty exhaustion check. Presence checks are bounded
+by the schema/policy attempt range; the exact operator count remains potentially
+expensive. Shared 100k/day write and 5M/day read allowances also cover other
+applications and all traffic, retries, maintenance and monitoring. With one idle
+consumer at the minimum five-second cadence, 18 local reads per claim/maintenance
+and 336 status checks at 37 reads is about 323,472 reads/day, excluding all event
+traffic and other workloads. This is an illustration, not proof of quota fit.
+Account-specific usage, peak backlog, request/CPU quotas, trigger/index write
+costs and hosted behavior remain gates. No monitor, schema or production service
+was activated.
+
+Pre-change presence test failed because the prior API provided only an exact count;
+the prior v4 measured 10,004 reads for the large exhausted fixture. The v5 local
+suite covers active/expired final leases, limits changed up and down, max attempts,
+invalid attempts, exact operator count, monitor schema rejection, and accounting.
+45 Node tests and nine SQLite tests pass locally; see PR for exact-head CI.
+
+## Earlier mixed-backlog baseline (schema v4)
 
 | 10,000-row local fixture | status reads | claim reads | quarantine reads / writes |
 | --- | ---: | ---: | ---: |

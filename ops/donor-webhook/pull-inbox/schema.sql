@@ -1,4 +1,4 @@
--- Preparation schema v4. Fresh local databases only. No live migration executed.
+-- Preparation schema v5. Fresh local databases only. No live migration executed.
 CREATE TABLE inbox (
     source TEXT NOT NULL,
     id TEXT NOT NULL,
@@ -8,7 +8,7 @@ CREATE TABLE inbox (
     created_at INTEGER NOT NULL DEFAULT (unixepoch()),
     lease_token TEXT,
     lease_until INTEGER NOT NULL DEFAULT 0,
-    attempts INTEGER NOT NULL DEFAULT 0,
+    attempts INTEGER NOT NULL DEFAULT 0 CHECK(typeof(attempts)='integer' AND attempts BETWEEN 0 AND 20),
     completed_at INTEGER,
     quarantined_at INTEGER,
     quarantine_count INTEGER NOT NULL DEFAULT 0,
@@ -18,8 +18,7 @@ CREATE TABLE inbox (
     CHECK(state != 'quarantined' OR (quarantined_at IS NOT NULL AND lease_token IS NULL)),
     CHECK(length(body) <= 262144)
 );
-CREATE INDEX inbox_pending ON inbox(source,state,lease_until,created_at,id);
-CREATE INDEX inbox_completed ON inbox(source,state,completed_at,id);
+CREATE INDEX inbox_completed ON inbox(source,completed_at,id) WHERE state='done';
 
 -- Singleton accounting is maintained transactionally by the triggers below.
 CREATE TABLE inbox_usage (
@@ -28,7 +27,7 @@ CREATE TABLE inbox_usage (
     payload_bytes INTEGER NOT NULL CHECK(payload_bytes>=0)
 );
 INSERT INTO inbox_usage VALUES(1,0,0);
-CREATE INDEX inbox_attempts ON inbox(source,state,attempts,lease_until,created_at,id);
+CREATE INDEX inbox_attempts ON inbox(source,attempts,lease_until,created_at,id) WHERE state='pending';
 
 CREATE TABLE inbox_source_usage (
     source TEXT PRIMARY KEY,

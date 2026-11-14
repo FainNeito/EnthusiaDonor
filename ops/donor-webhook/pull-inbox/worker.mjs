@@ -125,7 +125,7 @@ export function createWorker(sql) {
         if (!row) return response(503);
         return response(200, { ...row, max_rows: limits.rows, max_payload_bytes: limits.bytes,
           attention: row.rows >= limits.rows * 0.8 || row.payload_bytes >= limits.bytes * 0.8
-            || row.quarantined > 0 || row.exhausted > 0 || row.oldest_unprocessed_seconds >= 3600 });
+            || row.quarantined > 0 || row.exhausted_present === 1 || row.oldest_unprocessed_seconds >= 3600 });
       }
       if (url.pathname === '/consumer/claim') {
         if (Object.keys(input).length) return response(400);

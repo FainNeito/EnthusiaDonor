@@ -35,7 +35,7 @@ test('monitor credentials are read-only and status cannot mutate stored events',
   await f.send('preserve'); await f.post('/consumer/claim'); await f.expire();
   const before = await f.db.prepare('SELECT * FROM inbox').all();
   const r = await f.post('/monitor/status', {}, monitor); assert.equal(r.status, 200);
-  const status = await r.json(); assert.equal(status.exhausted, 1); assert.equal(status.attention, true);
+  const status = await r.json(); assert.equal(status.exhausted_present, 1); assert.equal(status.attention, true);
   assert.ok(Number.isSafeInteger(status.observed_at));
   for (const path of ['/consumer/claim', '/consumer/ack', '/consumer/status'])
     assert.equal((await f.post(path, {}, monitor)).status, 403);
@@ -75,10 +75,10 @@ test('quarantine transitions are bounded and exhausted rows cannot escape throug
   await insert.bind('another-store', 'keep', body, 'a'.repeat(64)).run();
   assert.equal((await f.post('/consumer/claim')).status, 204);
   let status = await (await f.post('/consumer/status')).json();
-  assert.equal(status.quarantined, 100); assert.equal(status.exhausted, 1); assert.equal(status.attention, true);
+  assert.equal(status.quarantined, 100); assert.equal(status.exhausted_present, 1); assert.equal(status.attention, true);
   assert.equal((await f.post('/consumer/claim')).status, 204);
   status = await (await f.post('/consumer/status')).json();
-  assert.equal(status.quarantined, 101); assert.equal(status.exhausted, 0);
+  assert.equal(status.quarantined, 101); assert.equal(status.exhausted_present, 0);
   assert.equal((await f.db.prepare("SELECT state FROM inbox WHERE source='another-store'").first()).state, 'pending');
 });
 
@@ -294,7 +294,7 @@ test('maintained status equals direct aggregation through source and state trans
    const actual=await f.db.prepare(`SELECT count(*) AS rows,coalesce(sum(length(body)),0) AS payload_bytes,
    coalesce(sum(source=?1 AND state='pending'),0) AS pending,coalesce(sum(source=?1 AND state='quarantined'),0) AS quarantined,
    coalesce(sum(source=?1 AND state='done'),0) AS completed,
-   coalesce(sum(source=?1 AND state='pending' AND attempts>=1 AND lease_until<=unixepoch()),0) AS exhausted FROM inbox`).bind(source).first();
+   coalesce(max(source=?1 AND state='pending' AND attempts>=1 AND lease_until<=unixepoch()),0) AS exhausted_present FROM inbox`).bind(source).first();
    for(const k of Object.keys(actual)) assert.equal(status[k],actual[k],k);
  };
  await verify('isolated'); await verify('other');
@@ -305,4 +305,32 @@ test('maintained status equals direct aggregation through source and state trans
  await f.db.prepare("DELETE FROM inbox_source_usage WHERE source='isolated'").run();
  assert.equal((await f.post('/consumer/status')).status,503);
  assert.equal((await f.send('third')).status,503);
+});
+
+test('exhaustion presence remains exact and bounded for large expired and active sets', {timeout:30000}, async t => {
+ const f=await fixture(t);
+ await f.db.prepare(`WITH RECURSIVE c(x) AS (SELECT 1 UNION ALL SELECT x+1 FROM c WHERE x<10000)
+ INSERT INTO inbox(source,id,body,signature,attempts,lease_until)
+ SELECT 'isolated',printf('%064x',x),x'01','s',5,unixepoch()+3600 FROM c`).run();
+ const query=()=>f.db.prepare(readFileSync(new URL('status.sql',import.meta.url),'utf8')).bind('isolated',5).run();
+ let status=await query(); assert.equal(status.results[0].exhausted_present,0); assert.ok(status.meta.rows_read<200,`active ${status.meta.rows_read}`);
+ await f.db.prepare("UPDATE inbox SET lease_until=0 WHERE id=printf('%064x',10000)").run();
+ status=await query(); assert.equal(status.results[0].exhausted_present,1);assert.ok(status.meta.rows_read<200,`expired ${status.meta.rows_read}`);
+ await f.db.prepare('UPDATE inbox SET lease_until=0').run();
+ status=await query();assert.equal(status.results[0].exhausted_present,1);assert.ok(status.meta.rows_read<200,`backlog ${status.meta.rows_read}`);
+});
+
+test('presence handles changed attempt limits, maximum attempts and operator exact counts', async t => {
+ const f=await fixture(t);
+ const insert=f.db.prepare("INSERT INTO inbox(source,id,body,signature,attempts,lease_until) VALUES('isolated',?1,x'01','s',?2,?3)");
+ await insert.bind('one',2,0).run(); await insert.bind('two',20,0).run(); await insert.bind('three',20,4102444800).run();
+ const sql=readFileSync(new URL('status.sql',import.meta.url),'utf8');
+ const count=readFileSync(new URL('inspect-exhausted-count.sql',import.meta.url),'utf8');
+ assert.equal((await f.db.prepare(sql).bind('isolated',20).first()).exhausted_present,1);
+ assert.equal((await f.db.prepare(count).bind('isolated',1).first()).exhausted,2);
+ await f.db.prepare("UPDATE inbox SET lease_until=4102444800 WHERE id='two'").run();
+ assert.equal((await f.db.prepare(sql).bind('isolated',20).first()).exhausted_present,0);
+ assert.equal((await f.db.prepare(sql).bind('isolated',2).first()).exhausted_present,1);
+ await assert.rejects(insert.bind('invalid',21,0).run());
+ await assert.rejects(insert.bind('fractional',1.5,0).run());
 });

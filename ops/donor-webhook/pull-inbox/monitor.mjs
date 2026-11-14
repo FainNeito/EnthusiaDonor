@@ -2,7 +2,7 @@ import https from 'node:https';
 import { pathToFileURL } from 'node:url';
 
 const unknown = reason => ({ code: 3, state: 'UNKNOWN', reasons: [reason] });
-const fields = ['rows', 'payload_bytes', 'pending', 'quarantined', 'completed', 'exhausted',
+const fields = ['rows', 'payload_bytes', 'pending', 'quarantined', 'completed', 'exhausted_present',
   'oldest_unprocessed_seconds', 'max_rows', 'max_payload_bytes', 'observed_at'];
 
 /** Pure classifier. Never return arbitrary response fields or exception messages. */
@@ -13,19 +13,19 @@ export function evaluate(value, now = Math.floor(Date.now() / 1000)) {
       || typeof value.attention !== 'boolean' || !Number.isSafeInteger(now)) return unknown('invalid_status');
   const v = value;
   if (v.max_rows < 1 || v.max_rows > 10000 || v.max_payload_bytes < 262144 || v.max_payload_bytes > 67108864
-      || v.pending + v.quarantined + v.completed > v.rows || v.exhausted > v.pending) return unknown('invalid_status');
+      || v.pending + v.quarantined + v.completed > v.rows || (v.exhausted_present > 1 || v.exhausted_present > v.pending)) return unknown('invalid_status');
   if (now - v.observed_at > 120 || v.observed_at - now > 30) return unknown('stale_or_skewed_status');
   const pressure = Math.max(v.rows / v.max_rows, v.payload_bytes / v.max_payload_bytes);
-  const attention = pressure >= 0.8 || v.quarantined > 0 || v.exhausted > 0 || v.oldest_unprocessed_seconds >= 3600;
+  const attention = pressure >= 0.8 || v.quarantined > 0 || v.exhausted_present > 0 || v.oldest_unprocessed_seconds >= 3600;
   if (attention !== v.attention) return unknown('inconsistent_status');
   const reasons = [];
   if (pressure >= 0.95) reasons.push('capacity_critical');
   else if (pressure >= 0.8) reasons.push('capacity_warning');
   if (v.quarantined) reasons.push('quarantine');
-  if (v.exhausted) reasons.push('exhausted_attempts');
+  if (v.exhausted_present) reasons.push('exhausted_attempts');
   if (v.oldest_unprocessed_seconds >= 86400) reasons.push('backlog_critical');
   else if (v.oldest_unprocessed_seconds >= 3600) reasons.push('backlog_warning');
-  const critical = pressure >= 0.95 || v.quarantined > 0 || v.exhausted > 0 || v.oldest_unprocessed_seconds >= 86400;
+  const critical = pressure >= 0.95 || v.quarantined > 0 || v.exhausted_present > 0 || v.oldest_unprocessed_seconds >= 86400;
   const code = critical ? 2 : attention ? 1 : 0;
   return { code, state: ['OK', 'WARNING', 'CRITICAL'][code], reasons: reasons.length ? reasons : ['inbox_clear'],
     metrics: Object.fromEntries(fields.map(key => [key, v[key]])) };

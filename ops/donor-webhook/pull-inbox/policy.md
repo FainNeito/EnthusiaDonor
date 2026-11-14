@@ -99,10 +99,10 @@ A read-only external probe and inactive integration proposal are now prepared in
 remain deployment gates. [Backup review](backup-retention-review.md) distinguishes
 plan-specific Time Travel history from live retention and records restore risks.
 
-`schema.sql` is now v4 for fresh databases, including mandatory usage-accounting triggers. No hosted v1–v3 database was created in
+`schema.sql` is now v5 for fresh databases, including mandatory usage-accounting triggers. No hosted v1–v4 database was created in
 this task, so there is no live migration. The v1 CHECK constraint does not allow
 quarantine and its columns are insufficient: do not point this Worker at a v1
-database or treat CREATE TABLE as a migration. Any pre-existing populated v1–v3 inbox
+database or treat CREATE TABLE as a migration. Any pre-existing populated v1–v4 inbox
 would need a separate data-preserving migration and verification plan. Keep
 consumer and Worker versions paired; an older Worker without `/consumer/status`
 will make the new consumer report RETRY when the next status refresh is due.
@@ -131,3 +131,7 @@ production activation is authorized or performed.
 
 Usage accounting, changed claim ordering, schema and reconciliation limitations
 are documented in [quota-review.md](quota-review.md). No migration is supplied.
+
+Status v5 exposes `exhausted_present` (0 or 1), not an exact count.
+Use `inspect-exhausted-count.sql` for an explicit operator-only exact count; it
+may scan the backlog. Worker and monitor must use the same status contract.

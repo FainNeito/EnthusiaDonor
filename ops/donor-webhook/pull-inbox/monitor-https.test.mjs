@@ -30,7 +30,7 @@ test('one-shot monitor enforces TLS, hostname, no redirects, body cap and total 
     else if (mode === 'stall') { res.write('{'); }
     else if (mode === 'secret-error') { res.statusCode = 503; res.end(token); }
     else res.end(JSON.stringify({ rows: 0, payload_bytes: 0, pending: 0, quarantined: 0, completed: 0,
-      exhausted: 0, oldest_unprocessed_seconds: 0, max_rows: 10000, max_payload_bytes: 67108864,
+      exhausted_present: 0, oldest_unprocessed_seconds: 0, max_rows: 10000, max_payload_bytes: 67108864,
       attention: false, observed_at: Math.floor(Date.now() / 1000) }));
   });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));

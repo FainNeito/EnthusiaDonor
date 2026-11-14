@@ -77,8 +77,9 @@ adapter. External storage/access/deletion behavior must be verified before use.
 ## Query cost and acceptance
 
 Status now uses transactional global and source counters with indexed age and
-exhaustion queries. Normal completed/leased fixtures are inexpensive, but exact
-exhaustion counts can still scan the bounded pending set. See the measured
+exhaustion-presence queries. `exhausted_present` is 0 or 1, never an exact count;
+the separately invoked operator count can still scan the bounded pending set.
+The monitor requires the v5 field and rejects older or malformed responses. See the measured
 [quota review](quota-review.md); do not assume a shared account budget is met.
 Physical storage and Time Travel remain separate from the reported payload bytes.
 
