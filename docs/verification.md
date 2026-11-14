@@ -199,3 +199,10 @@ Schema v4 is fresh-only; no hosted migration or activation occurred.
 presence-only status contract, on-demand exact count, local D1 read/write
 comparisons and 45 Node plus nine SQLite tests. Schema v5 is fresh-only; no
 hosted migration, alert or activation occurred.
+
+## Shared quota and hosted acceptance — 2026-11-13
+
+[Account snapshot and acceptance plan](../ops/donor-webhook/pull-inbox/hosted-acceptance.md)
+record UTC daily usage, its early-day limitation, baseline/reserve gates and
+isolated test/cleanup criteria. No hosted resources, traffic or production changes
+were created. Actual Free-quota fit and hosted acceptance remain unverified.

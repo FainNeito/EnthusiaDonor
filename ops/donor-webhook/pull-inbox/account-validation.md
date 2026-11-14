@@ -37,3 +37,8 @@ in the inactive example. The existing billing alert is not reused or changed.
 Pure routing decisions are prepared in [alert-routing.md](alert-routing.md);
 provider persistence, independent watchdog and actual destination receipt remain
 acceptance gates. No alerts, schedules, secrets or destinations were created.
+
+A later read-only dashboard snapshot and the prepared hosted test gates are in
+[hosted-acceptance.md](hosted-acceptance.md). The prior capacity numbers above
+were v2 estimates; current v5 measurements and their limitations are recorded
+in [quota-review.md](quota-review.md). No hosted inbox was created.
