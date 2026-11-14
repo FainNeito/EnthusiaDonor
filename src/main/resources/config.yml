@@ -18,6 +18,9 @@ notifications:
   # Experimental: enable only after MariaDB and webhook end-to-end acceptance.
   tebex-webhook:
     enabled: false
+    pull-enabled: false # Alternative to the loopback receiver; never enable both.
+    inbox-origin: '' # HTTPS Worker origin only, no path/query; pending hosted acceptance.
+    consumer-token: '' # Separate private token, not the Tebex signing secret or Cloudflare API key.
     port: 0 # Loopback-only, set an explicit port and configure a trusted HTTPS reverse proxy.
     secret: '' # Private Tebex webhook signing secret; never commit a real secret.
     wait-seconds: 120 # Enrichment window; late webhook events cannot change sent messages.

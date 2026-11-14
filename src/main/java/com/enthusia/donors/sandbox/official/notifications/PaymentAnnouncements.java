@@ -25,6 +25,7 @@ public final class PaymentAnnouncements implements AutoCloseable {
     private final NotificationDispatcher dispatcher;
     private final boolean webhookEnabled; private final long webhookWaitSeconds;
     private TebexHttpReceiver receiver;
+    private TebexInboxConsumer inbox;
     private record EligibilitySnapshot(DonorsConfig config,Set<String> exclusions,Instant refreshedAt) { }
     private volatile EligibilitySnapshot eligibilitySnapshot;
     private volatile boolean closed;private boolean ready;private volatile String status="STARTING",ingestionStatus="WAITING_FOR_FIRST_SYNC";private long lastWarning;
@@ -44,23 +45,25 @@ public final class PaymentAnnouncements implements AutoCloseable {
         Properties relayCredentials=new Properties();relayCredentials.setProperty("user",plugin.getConfig().getString("relay.username",""));relayCredentials.setProperty("password",plugin.getConfig().getString("relay.password",""));relayCredentials.setProperty("connectTimeout","5000");relayCredentials.setProperty("socketTimeout","5000");
         relay=new RelayStore(()->DriverManager.getConnection(config.network().jdbcUrl(),relayCredentials),RelayStore.Dialect.MARIADB);
         dispatcher=new NotificationDispatcher(store,relay::publish,payload->discord.send(settings.webhook(),payload));
-        webhookEnabled=plugin.getConfig().getBoolean("notifications.tebex-webhook.enabled",false);
-        webhookWaitSeconds=plugin.getConfig().getLong("notifications.tebex-webhook.wait-seconds",120);
+        var ingress=TebexIngressSettings.load(plugin.getConfig());
+        webhookEnabled=ingress.enabled();
+        webhookWaitSeconds=ingress.waitSeconds();
         if(webhookEnabled) {
-            String secret=plugin.getConfig().getString("notifications.tebex-webhook.secret","");
-            int port=plugin.getConfig().getInt("notifications.tebex-webhook.port",0);
-            if(secret==null || secret.getBytes(StandardCharsets.UTF_8).length<32 || port<1024 || port>65535 || webhookWaitSeconds<1 || webhookWaitSeconds>=900)
-                throw new IllegalArgumentException("Invalid Tebex webhook secret, port or wait interval");
             var client=new com.enthusia.donors.tebex.TebexClient(plugin.getLogger());
             try {
-                receiver=TebexWebhookAssembly.loopback(new java.net.InetSocketAddress("127.0.0.1",port),secret,store,client,config.get(),
+                var endpoint=TebexWebhookAssembly.endpoint(ingress.secret(),store,client,config.get(),
                         payment->{
                             var snapshot=eligibilitySnapshot;
                             if(snapshot==null || Instant.now().isAfter(snapshot.refreshedAt().plusSeconds(Math.max(120L,snapshot.config().refreshIntervalMinutes()*120L))))
                                 throw new IllegalStateException("Official eligibility snapshot unavailable or stale");
                             return eligible(payment,snapshot.config(),snapshot.exclusions(),Instant.now());
                         },(payment,event)->payload(payment,Instant.now(),event.kind()==TebexWebhookEvidence.Kind.RENEWAL));
-                receiver.start();
+                if(ingress.pullEnabled()) {
+                    inbox=new TebexInboxConsumer(ingress.origin(),ingress.token(),endpoint);
+                } else {
+                    receiver=new TebexHttpReceiver(new java.net.InetSocketAddress("127.0.0.1",ingress.port()),endpoint);
+                    receiver.start();
+                }
             } catch(java.io.IOException failure) {throw new IllegalStateException("Unable to bind Tebex webhook receiver",failure);}
         }
         worker.scheduleWithFixedDelay(this::flush,0,2,TimeUnit.SECONDS);
@@ -87,6 +90,9 @@ public final class PaymentAnnouncements implements AutoCloseable {
                         ?store.observeDeferred(payments,now,p->eligible(p,config,exclusions,now),p->Objects.requireNonNull(prepared.get(p.paymentIdHash()),"Concurrent source initialization; retry on the next poll"))
                         :store.observe(payments,now,p->eligible(p,config,exclusions,now),p->Objects.requireNonNull(prepared.get(p.paymentIdHash()),"Concurrent source initialization; retry on the next poll"));
                 eligibilitySnapshot=new EligibilitySnapshot(config,Set.copyOf(exclusions),now);
+                // Claim only after a successful official sync established the
+                // durable baseline and current eligibility snapshot.
+                if(inbox!=null)inbox.start();
                 ingestionStatus="OBSERVED | queued "+queued;
             } catch(Exception failure) {ingestionStatus="OBSERVATION_ERROR";warn("OBSERVATION_ERROR");}
             finally {accepting.set(false);}
@@ -135,10 +141,10 @@ public final class PaymentAnnouncements implements AutoCloseable {
     private void warn(String state) {
         status=state;long now=System.currentTimeMillis();if(now-lastWarning>60_000) {lastWarning=now;plugin.getLogger().warning("Real donation announcements: "+state+". Persisted jobs/claims retained; check publisher database and notification status. No unsaved fallback or automatic uncertain resend.");}
     }
-    public String status() {return ingestionStatus+" | "+status;}
+    public String status() {return ingestionStatus+" | "+status+(inbox==null?"":" | INBOX_"+inbox.status());}
     private static String hash(String value) {
         try {return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8)));}
         catch(Exception error) {throw new IllegalStateException("Notification identity unavailable",error);}
     }
-    @Override public void close() {closed=true;if(receiver!=null)receiver.close();worker.shutdownNow();}
+    @Override public void close() {closed=true;if(inbox!=null)inbox.close();if(receiver!=null)receiver.close();worker.shutdownNow();}
 }

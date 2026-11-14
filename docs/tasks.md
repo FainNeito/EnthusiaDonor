@@ -1,5 +1,21 @@
 # EnthusiaDonor Tasks
 
+## Dedicated webhook route preparation — 2026-11-11
+
+- [x] Refresh canonical main and keep PR #8 separate; use an isolated branch.
+- [x] Prepare exact-route buffered NGINX template and loopback regression harness.
+- [x] Verify 22 route tests, including actual receiver HMAC validation, plus the
+  existing Java suite (230 passed, 1 optional MariaDB test skipped).
+- [x] Record deliberately unbuffered failing control, scope, deployment gates
+  and rollback plan in [route plan](../ops/donor-webhook/route-plan.md) and
+  [evidence](../ops/donor-webhook/route-evidence.md).
+- [ ] Review receiver hardening separately; repeat on exact merged release.
+- [ ] Verify supported Bloom same-namespace supervision, downstream transport,
+  origin restrictions, total upload bound, Linux and Java 21 behavior.
+- [ ] Obtain later explicit activation approval before DNS/ports/runtime changes.
+
+No production changes or restart were performed during this preparation.
+
 ## Real purchase incident — 2026-10-09
 
 - [x] Create approved dedicated database; keep restricted source address.
@@ -138,6 +154,19 @@ Requirements:
 - Keep the rank strings configurable in the bulk-update config rather than hard-coding them.
 
 ## Donation announcement details (2026-11-10)
+
+### Outbound webhook preparation (2026-11-12)
+
+- [x] Implement an inactive Worker/D1 inbox and opt-in Java HTTPS pull consumer without Bloom ingress/support.
+- [x] Verify authenticated durable admission, lease/ACK behavior, TLS/response protections and outbox redelivery locally.
+- [x] Add atomic capacity, quarantine, completed-tombstone retention and authenticated attention status; verify recovery/preservation locally.
+- [x] Prepare a read-only external monitor, inactive integration proposal, backup-retention review and synthetic restore exercise.
+- [x] Inspect account plan/backup capability read-only and test inactive alert-routing decisions.
+- [ ] Assign/install the external monitor and verify alert routing; resolve account-specific backup/raw-data disposition and operator ownership; independently review the draft.
+- [ ] Verify hosted D1, actual outbound egress and end-to-end/failover acceptance under separate authorization.
+- Evidence and remaining gates: [outbound inbox](../ops/donor-webhook/outbound-inbox-plan.md).
+
+### Existing announcement acceptance
 
 - [ ] Validate package name parsing and announcement rendering with real Tebex-compatible fixtures.
 - [ ] Identify an authoritative event source for gift buyer/recipient and renewal status; implement only after verified payload and deduplication behavior.

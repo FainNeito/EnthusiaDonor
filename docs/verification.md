@@ -130,3 +130,87 @@ Live Paper, PlaceholderAPI, hologram, and Tebex comparisons remain pending. This
 - Staged on Velocity 25319956: plugins/chapter 2 staging/EnthusiaDonors-VelocityRelay-1.1.0-test.15.jar and EnthusiaDonors-test15-activation.md. A proxy staging folder was created; existing active JAR/configuration were not replaced.
 - Screenshots: ../artifacts/donor-test15-staging/backend.jpg and proxy.jpg. These prove remote file presence, not active plugin loading or client/Discord delivery. No restart, reload, test/real notification, commit, push, PR or production database provisioning occurred.
 - Remaining acceptance: shared MariaDB schema/credentials and matching source/signing configuration, later approved plugin activation, baseline sync, subsequent actual payment shown across two backends and smp-chatter, live outage/shutdown recovery. Current official polling interval is 10 minutes; it can be reduced to 1 minute. Official Glorious finalization/permission grants are still separate work.
+
+## Dedicated route preparation — 2026-11-11
+
+Update 2026-11-12: the default-off outbound Worker/D1 + plugin consumer is now
+implemented and tested locally. See [inbox evidence](../ops/donor-webhook/pull-inbox/evidence.md)
+for behavioral red/green evidence, local workerd/D1 and HTTPS checks, full Java
+suite results and unresolved operational/hosted gates. The following route
+results describe the earlier NGINX reference path, not the outbound alternative.
+
+The isolated NGINX fixture passed 22 transport/actual-receiver tests against main
+`b9edd9b78f5ef3cd011b81f377e1bc450e066e8e`. The deliberately unbuffered control
+failed with `Incomplete body reached upstream`. Maven test-compile and the
+existing suite passed: 231 run, 230 passed, 1 optional MariaDB case skipped.
+These are Windows/JDK 25 local results, not production or Linux acceptance.
+See [route evidence](../ops/donor-webhook/route-evidence.md) and
+[route plan](../ops/donor-webhook/route-plan.md). PR #8 remains separate. No
+production restart, configuration change, DNS update or endpoint activation.
+
+## Inbox policy preparation - 2026-11-12
+
+See [policy requirements and evidence](../ops/donor-webhook/pull-inbox/policy.md)
+for capacity/quarantine/retention red-green tests and remaining hosted/operational
+gates. The plugin reports attention when idle claims conceal quarantined work.
+No production changes; PR #9 remains draft.
+
+## External monitor and backup review preparation - 2026-11-12
+
+[Monitoring evidence](../ops/donor-webhook/pull-inbox/monitoring.md) covers read-only
+credential isolation, status freshness/classification, safe output and local HTTPS
+protections. [Backup review](../ops/donor-webhook/pull-inbox/backup-retention-review.md)
+records plan-specific Time Travel documentation and a synthetic SQLite restore
+that resurrects previously ACKed/pruned data. No hosted monitor, backup, restore,
+notification, restart or activation occurred. PR #9 remains draft.
+
+## Account validation and dry-run alert routing — 2026-11-12
+
+[Account evidence](../ops/donor-webhook/pull-inbox/account-validation.md) confirms
+Workers Free and a sampled seven-day Time Travel window, not donor restore
+acceptance. [Routing evidence](../ops/donor-webhook/pull-inbox/alert-routing.md)
+records five red assertions and eight passing routing tests; full local Node
+suite 35/35. Shared read quota is a deployment gate. Provider/owners/destination
+remain unassigned; no sends, production activation or restart. PR #9 stays draft.
+
+## Inbox quota tuning — 2026-11-12
+
+See [quota measurement and limits](../ops/donor-webhook/pull-inbox/quota-review.md).
+A new cache-cadence assertion failed before implementation and passes afterward;
+status can be up to 30 minutes old. Local D1 measures show backlog/admission
+scans still require further tuning and hosted quota verification. No deployment.
+
+## Admission and exhausted backlog quota work — 2026-11-13
+
+[Local D1 results](../ops/donor-webhook/pull-inbox/quota-review.md) record
+transactional usage accounting and indexed queries, red tests and 40 Node plus
+nine SQLite tests. Adversarial mixed leases and shared quotas remain deployment
+gates. Schema v3 is fresh-only; no hosted migration or activation occurred.
+
+## Mixed backlog and status quota work — 2026-11-13
+
+[Quota evidence](../ops/donor-webhook/pull-inbox/quota-review.md) records red
+tests, local D1 measurements, remaining exhaustion scans and extra writes.
+Schema v4 is fresh-only; no hosted migration or activation occurred.
+
+## Exhaustion status and write quota work — 2026-11-13
+
+[Quota evidence](../ops/donor-webhook/pull-inbox/quota-review.md) records the
+presence-only status contract, on-demand exact count, local D1 read/write
+comparisons and 45 Node plus nine SQLite tests. Schema v5 is fresh-only; no
+hosted migration, alert or activation occurred.
+
+## Shared quota and hosted acceptance — 2026-11-13
+
+[Account snapshot and acceptance plan](../ops/donor-webhook/pull-inbox/hosted-acceptance.md)
+record UTC daily usage, its early-day limitation, baseline/reserve gates and
+isolated test/cleanup criteria. No hosted resources, traffic or production changes
+were created. Actual Free-quota fit and hosted acceptance remain unverified.
+
+## Baseline evidence and isolated test manifest — 2026-11-13
+
+[Hosted acceptance](../ops/donor-webhook/pull-inbox/hosted-acceptance.md) records
+a second partial-day snapshot, rounded account billing-period totals and one
+database rolling seven-day view. The account-wide complete UTC-day series is not
+available from these observations. An inactive manifest remains unbound and has
+no execution mechanism. No hosted test or production action occurred.
